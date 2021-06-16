@@ -1,12 +1,4 @@
 #include "RenderAPI.h"
-#include "PlatformBase.h"
-
-// OpenGL Core profile (desktop) or OpenGL ES (mobile) implementation of RenderAPI.
-// Supports several flavors: Core, ES2, ES3
-
-
-#if SUPPORT_OPENGL_UNIFIED
-
 
 #include <assert.h>
 #include <GLES2/gl2.h>
@@ -18,11 +10,6 @@ public:
 	virtual ~RenderAPI_OpenGLCoreES() { }
 
 	virtual void ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterfaces* interfaces);
-
-	virtual bool GetUsesReverseZ() { return false; }
-
-	virtual void* BeginModifyTexture(void* textureHandle, int textureWidth, int textureHeight, int* outRowPitch);
-	virtual void EndModifyTexture(void* textureHandle, int textureWidth, int textureHeight, int rowPitch, void* dataPtr);
 
 private:
 	void CreateResources();
@@ -71,9 +58,6 @@ enum VertexInputs
 
 static const char* kGlesVProgTextGLES2 = VERTEX_SHADER_SRC("\n", "attribute", "varying");
 static const char* kGlesVProgTextGLES3 = VERTEX_SHADER_SRC("#version 300 es\n", "in", "out");
-#if SUPPORT_OPENGL_CORE
-static const char* kGlesVProgTextGLCore = VERTEX_SHADER_SRC("#version 150\n", "in", "out");
-#endif
 
 #undef VERTEX_SHADER_SRC
 
@@ -91,9 +75,6 @@ static const char* kGlesVProgTextGLCore = VERTEX_SHADER_SRC("#version 150\n", "i
 
 static const char* kGlesFShaderTextGLES2 = FRAGMENT_SHADER_SRC("\n", "varying", "\n", "gl_FragColor");
 static const char* kGlesFShaderTextGLES3 = FRAGMENT_SHADER_SRC("#version 300 es\n", "in", "out lowp vec4 fragColor;\n", "fragColor");
-#if SUPPORT_OPENGL_CORE
-static const char* kGlesFShaderTextGLCore = FRAGMENT_SHADER_SRC("#version 150\n", "in", "out lowp vec4 fragColor;\n", "fragColor");
-#endif
 
 #undef FRAGMENT_SHADER_SRC
 
@@ -110,27 +91,8 @@ static GLuint CreateShader(GLenum type, const char* sourceText)
 void RenderAPI_OpenGLCoreES::CreateResources()
 {
 	// Create shaders
-	if (m_APIType == kUnityGfxRendererOpenGLES20)
-	{
-		m_VertexShader = CreateShader(GL_VERTEX_SHADER, kGlesVProgTextGLES2);
-		m_FragmentShader = CreateShader(GL_FRAGMENT_SHADER, kGlesFShaderTextGLES2);
-	}
-	else if (m_APIType == kUnityGfxRendererOpenGLES30)
-	{
-		m_VertexShader = CreateShader(GL_VERTEX_SHADER, kGlesVProgTextGLES3);
-		m_FragmentShader = CreateShader(GL_FRAGMENT_SHADER, kGlesFShaderTextGLES3);
-	}
-#	if SUPPORT_OPENGL_CORE
-	else if (m_APIType == kUnityGfxRendererOpenGLCore)
-	{
-#		if UNITY_WIN
-		gl3wInit();
-#		endif
-
-		m_VertexShader = CreateShader(GL_VERTEX_SHADER, kGlesVProgTextGLCore);
-		m_FragmentShader = CreateShader(GL_FRAGMENT_SHADER, kGlesFShaderTextGLCore);
-	}
-#	endif // if SUPPORT_OPENGL_CORE
+	m_VertexShader = CreateShader(GL_VERTEX_SHADER, kGlesVProgTextGLES3);
+	m_FragmentShader = CreateShader(GL_FRAGMENT_SHADER, kGlesFShaderTextGLES3);
 
 
 	// Link shaders into a program and find uniform locations
@@ -139,10 +101,7 @@ void RenderAPI_OpenGLCoreES::CreateResources()
 	glBindAttribLocation(m_Program, kVertexInputColor, "color");
 	glAttachShader(m_Program, m_VertexShader);
 	glAttachShader(m_Program, m_FragmentShader);
-#	if SUPPORT_OPENGL_CORE
-	if (m_APIType == kUnityGfxRendererOpenGLCore)
-		glBindFragDataLocation(m_Program, 0, "fragColor");
-#	endif // if SUPPORT_OPENGL_CORE
+
 	glLinkProgram(m_Program);
 
 	GLint status = 0;
@@ -178,24 +137,3 @@ void RenderAPI_OpenGLCoreES::ProcessDeviceEvent(UnityGfxDeviceEventType type, IU
 		//@TODO: release resources
 	}
 }
-
-void* RenderAPI_OpenGLCoreES::BeginModifyTexture(void* textureHandle, int textureWidth, int textureHeight, int* outRowPitch)
-{
-	const int rowPitch = textureWidth * 4;
-	// Just allocate a system memory buffer here for simplicity
-	unsigned char* data = new unsigned char[rowPitch * textureHeight];
-	*outRowPitch = rowPitch;
-	return data;
-}
-
-
-void RenderAPI_OpenGLCoreES::EndModifyTexture(void* textureHandle, int textureWidth, int textureHeight, int rowPitch, void* dataPtr)
-{
-	GLuint gltex = (GLuint)(size_t)(textureHandle);
-	// Update texture data, and free the memory buffer
-	glBindTexture(GL_TEXTURE_2D, gltex);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, textureWidth, textureHeight, GL_RGBA, GL_UNSIGNED_BYTE, dataPtr);
-	delete[](unsigned char*)dataPtr;
-}
-
-#endif // #if SUPPORT_OPENGL_UNIFIED

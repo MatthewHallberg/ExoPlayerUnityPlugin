@@ -1,11 +1,10 @@
 // Example low level rendering Unity plugin
-
-#include "PlatformBase.h"
 #include "RenderAPI.h"
 
 #include <assert.h>
 #include <math.h>
 #include <vector>
+#include <GLES2/gl2.h>
 
 // --------------------------------------------------------------------------
 // SetTextureFromUnity, an example function we export which is called by one of the scripts.
@@ -82,23 +81,24 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
 static void ModifyTexturePixels()
 {
     void* textureHandle = g_TextureHandle;
-    int width = g_TextureWidth;
-    int height = g_TextureHeight;
     if (!textureHandle)
         return;
 
-    int textureRowPitch;
-    void* textureDataPtr = s_CurrentAPI->BeginModifyTexture(textureHandle, width, height, &textureRowPitch);
+
+    int textureRowPitch = g_TextureWidth * 4;
+    // Just allocate a system memory buffer here for simplicity
+    unsigned char* textureDataPtr = new unsigned char[textureRowPitch * g_TextureHeight];
+
     if (!textureDataPtr)
         return;
 
     const float t = 0;
 
     unsigned char* dst = (unsigned char*)textureDataPtr;
-    for (int y = 0; y < height; ++y)
+    for (int y = 0; y < g_TextureHeight; ++y)
     {
         unsigned char* ptr = dst;
-        for (int x = 0; x < width; ++x)
+        for (int x = 0; x < g_TextureWidth; ++x)
         {
             // Simple "plasma effect": several combined sine waves
             int vv = int(
@@ -122,7 +122,11 @@ static void ModifyTexturePixels()
         dst += textureRowPitch;
     }
 
-    s_CurrentAPI->EndModifyTexture(textureHandle, width, height, textureRowPitch, textureDataPtr);
+    GLuint gltex = (GLuint)(size_t)(textureHandle);
+    // Update texture data, and free the memory buffer
+    glBindTexture(GL_TEXTURE_2D, gltex);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, g_TextureWidth, g_TextureHeight, GL_RGBA, GL_UNSIGNED_BYTE, textureDataPtr);
+    delete[](unsigned char*)textureDataPtr;
 }
 
 static void UNITY_INTERFACE_API OnRenderEvent(int eventID)
