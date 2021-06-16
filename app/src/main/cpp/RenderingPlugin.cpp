@@ -7,14 +7,6 @@
 #include <math.h>
 #include <vector>
 
-
-// --------------------------------------------------------------------------
-// SetTimeFromUnity, an example function we export which is called by one of the scripts.
-
-static float g_Time;
-
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetTimeFromUnity (float t) { g_Time = t; }
-
 // --------------------------------------------------------------------------
 // SetTextureFromUnity, an example function we export which is called by one of the scripts.
 
@@ -100,7 +92,7 @@ static void ModifyTexturePixels()
     if (!textureDataPtr)
         return;
 
-    const float t = g_Time * 4.0f;
+    const float t = 0;
 
     unsigned char* dst = (unsigned char*)textureDataPtr;
     for (int y = 0; y < height; ++y)
