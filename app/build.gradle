@@ -1,8 +1,25 @@
 apply plugin: 'com.android.library'
 
+task copybuild(type: Copy) {
+    from('build/outputs/aar')
+    into('C:/Users/matth/TextureTest/Assets/Plugins/Android/libs')
+    include('videoPlayerPlugin.aar')
+    println('after build')
+}
+
 android {
     compileSdkVersion 29
     buildToolsVersion "28.0.3"
+
+    libraryVariants.all { variant ->
+        variant.outputs.all {
+            outputFileName = "videoPlayerPlugin.aar"
+        }
+    }
+
+    afterEvaluate {
+        assembleDebug.finalizedBy(copybuild)
+    }
 
     defaultConfig {
         minSdkVersion 24
@@ -34,7 +51,6 @@ android {
             version '3.10.2'
         }
     }
-
 }
 
 dependencies {
