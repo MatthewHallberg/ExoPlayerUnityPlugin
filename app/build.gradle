@@ -11,12 +11,14 @@ android {
     compileSdkVersion 29
     buildToolsVersion "28.0.3"
 
+    //rename plugin file
     libraryVariants.all { variant ->
         variant.outputs.all {
             outputFileName = "videoPlayerPlugin.aar"
         }
     }
 
+    //after build completes copy to unity project
     afterEvaluate {
         assembleDebug.finalizedBy(copybuild)
     }
@@ -59,4 +61,5 @@ dependencies {
     implementation 'com.google.android.exoplayer:exoplayer:2.9.0'
     implementation files('libs/audio360.aar')
     implementation files('libs/audio360-exo29.aar')
+    compileOnly files('libs/classes.jar')
 }

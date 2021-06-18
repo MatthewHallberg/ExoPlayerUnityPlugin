@@ -21,9 +21,8 @@ add_library( # Sets the name of the library.
              SHARED
 
              # Provides a relative path to your source file(s).
-        RenderAPI.cpp
-            RenderAPI.h
-            RenderAPI_OpenGLCoreES.cpp
+            OpenGL.h
+            OpenGL.cpp
             RenderingPlugin.cpp
             RenderingPlugin.def
         )

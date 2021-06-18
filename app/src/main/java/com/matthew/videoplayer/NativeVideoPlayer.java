@@ -7,26 +7,19 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.storage.OnObbStateChangeListener;
 import android.os.storage.StorageManager;
-//import android.support.annotation.Nullable;
 import android.util.Log;
 import android.view.Surface;
-
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.C.ContentType;
 import com.google.android.exoplayer2.DefaultRenderersFactory;
-import com.google.android.exoplayer2.ExoPlaybackException;
-import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.PlaybackParameters;
-import com.google.android.exoplayer2.PlaybackPreparer;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.Renderer;
-import com.google.android.exoplayer2.RenderersFactory;
 import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.Timeline;
-import com.google.android.exoplayer2.audio.AudioProcessor;
 import com.google.android.exoplayer2.audio.AudioRendererEventListener;
 import com.google.android.exoplayer2.audio.AudioSink;
 import com.google.android.exoplayer2.drm.DefaultDrmSessionManager;
@@ -35,31 +28,18 @@ import com.google.android.exoplayer2.drm.FrameworkMediaCrypto;
 import com.google.android.exoplayer2.drm.FrameworkMediaDrm;
 import com.google.android.exoplayer2.drm.HttpMediaDrmCallback;
 import com.google.android.exoplayer2.drm.UnsupportedDrmException;
-import com.google.android.exoplayer2.mediacodec.MediaCodecRenderer.DecoderInitializationException;
-import com.google.android.exoplayer2.mediacodec.MediaCodecSelector;
-import com.google.android.exoplayer2.mediacodec.MediaCodecUtil.DecoderQueryException;
 import com.google.android.exoplayer2.metadata.MetadataOutput;
-import com.google.android.exoplayer2.source.BehindLiveWindowException;
-import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
 import com.google.android.exoplayer2.source.ExtractorMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
-import com.google.android.exoplayer2.source.TrackGroupArray;
-import com.google.android.exoplayer2.source.ads.AdsLoader;
-import com.google.android.exoplayer2.source.ads.AdsMediaSource;
-import com.google.android.exoplayer2.source.dash.DashChunkSource;
 import com.google.android.exoplayer2.source.dash.DefaultDashChunkSource;
 import com.google.android.exoplayer2.source.dash.DashMediaSource;
 import com.google.android.exoplayer2.source.hls.HlsMediaSource;
 import com.google.android.exoplayer2.source.smoothstreaming.DefaultSsChunkSource;
-import com.google.android.exoplayer2.source.smoothstreaming.SsChunkSource;
 import com.google.android.exoplayer2.source.smoothstreaming.SsMediaSource;
 import com.google.android.exoplayer2.text.TextOutput;
 import com.google.android.exoplayer2.trackselection.AdaptiveTrackSelection;
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
-import com.google.android.exoplayer2.trackselection.MappingTrackSelector.MappedTrackInfo;
-import com.google.android.exoplayer2.trackselection.RandomTrackSelection;
 import com.google.android.exoplayer2.trackselection.TrackSelection;
-import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 import com.google.android.exoplayer2.upstream.BandwidthMeter;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
@@ -72,11 +52,7 @@ import com.google.android.exoplayer2.upstream.cache.CacheDataSource;
 import com.google.android.exoplayer2.upstream.cache.CacheDataSourceFactory;
 import com.google.android.exoplayer2.upstream.cache.NoOpCacheEvictor;
 import com.google.android.exoplayer2.upstream.cache.SimpleCache;
-import com.google.android.exoplayer2.util.ErrorMessageProvider;
-import com.google.android.exoplayer2.util.EventLogger;
 import com.google.android.exoplayer2.util.Util;
-import com.google.android.exoplayer2.video.MediaCodecVideoRenderer;
-import com.google.android.exoplayer2.video.VideoListener;
 import com.google.android.exoplayer2.video.VideoRendererEventListener;
 import com.twobigears.audio360.AudioEngine;
 import com.twobigears.audio360.ChannelMap;
@@ -85,17 +61,11 @@ import com.twobigears.audio360.TBQuat;
 import com.twobigears.audio360exo2.Audio360Sink;
 import com.twobigears.audio360exo2.OpusRenderer;
 import java.io.File;
-import java.lang.reflect.Constructor;
 import java.lang.Math;
 import java.lang.System;
-import java.net.CookieHandler;
-import java.net.CookieManager;
-import java.net.CookiePolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Dictionary;
 import java.util.Hashtable;
-import java.util.List;
 import java.util.UUID;
 import android.opengl.EGL14;
 import android.opengl.EGLContext;
@@ -103,7 +73,7 @@ import android.opengl.EGLDisplay;
 import android.opengl.EGLSurface;
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
-
+import com.unity3d.player.UnityPlayer;
 
 public class NativeVideoPlayer
 {
@@ -311,21 +281,7 @@ public class NativeVideoPlayer
         }
     }
 
-    public static void updateSurfaceTexture()
-    {
-        Log.d(TAG, "Update called...");
-        videoPlayers.forEach((k, v) -> {
-            if (v.updateAvailable) {
-                if (!Thread.currentThread().getName().equals("UnityMain"))
-                    Log.e(TAG, "Not called from render thread and hence update texture will fail");
-                v.mSurfaceTexture.updateTexImage();
-                Log.d(TAG, "UPDATED!!!!");
-                v.updateAvailable = false;
-            }
-        });
-    }
-
-    public static void playVideo( final Context context, final String filePath, final String videoID, final int unityTextureID)
+    public static void playVideo(final String filePath, final String videoID, final int unityTextureID)
     {
 
         Log.d(TAG, "Texture Pointer: " + unityTextureID);
@@ -380,7 +336,7 @@ public class NativeVideoPlayer
                 DefaultTrackSelector trackSelector =
                         new DefaultTrackSelector(videoTrackSelectionFactory);
                 // Produces DataSource instances through which media data is loaded.
-                DataSource.Factory dataSourceFactory = buildDataSourceFactory(context,currVideoPlayer);
+                DataSource.Factory dataSourceFactory = buildDataSourceFactory(UnityPlayer.currentActivity,currVideoPlayer);
 
                 Uri uri = Uri.parse( filePath );
 
@@ -391,7 +347,7 @@ public class NativeVideoPlayer
                     else if (filePath.contains(".obb")) { // OBB
                         String obbPath = filePath.substring(11, filePath.indexOf(".obb") + 4);
 
-                        StorageManager sm = (StorageManager)context.getSystemService(Context.STORAGE_SERVICE);
+                        StorageManager sm = (StorageManager)UnityPlayer.currentActivity.getSystemService(Context.STORAGE_SERVICE);
                         if (!sm.isObbMounted(obbPath))
                         {
                             sm.mountObb(obbPath, null, new OnObbStateChangeListener() {
@@ -408,17 +364,9 @@ public class NativeVideoPlayer
 
                 // Set up video source if drmLicenseUrl is set
                 DefaultDrmSessionManager<FrameworkMediaCrypto> drmSessionManager = null;
-/*                if (drmLicenseUrl != null && drmLicenseUrl.length() > 0) {
-                    try {
-                        drmSessionManager = buildDrmSessionManagerV18(context,
-                      Util.getDrmUuid("widevine"), drmLicenseUrl, null, false);
-                    } catch (UnsupportedDrmException e) {
-                        Log.e(TAG, "Unsupported DRM!", e);
-                    }
-                }*/
 
                 // This is the MediaSource representing the media to be played.
-                MediaSource videoSource = buildMediaSource(context, uri, null, dataSourceFactory);
+                MediaSource videoSource = buildMediaSource(UnityPlayer.currentActivity, uri, null, dataSourceFactory);
 
                 Log.d(TAG, "Requested play of " +filePath + " uri: "+uri.toString());
 
@@ -427,7 +375,7 @@ public class NativeVideoPlayer
                 //- Audio Engine
                 if (currVideoPlayer.engine == null)
                 {
-                    currVideoPlayer.engine = AudioEngine.create(SAMPLE_RATE, BUFFER_SIZE, QUEUE_SIZE_IN_SAMPLES, context);
+                    currVideoPlayer.engine = AudioEngine.create(SAMPLE_RATE, BUFFER_SIZE, QUEUE_SIZE_IN_SAMPLES, UnityPlayer.currentActivity);
                     currVideoPlayer.spat = currVideoPlayer.engine.createSpatDecoderQueue();
                     currVideoPlayer.engine.start();
                 }
@@ -440,7 +388,7 @@ public class NativeVideoPlayer
                 {
                     currVideoPlayer.exoPlayer.release();
                 }
-                currVideoPlayer.exoPlayer = ExoPlayerFactory.newSimpleInstance(context, new CustomRenderersFactory(context), trackSelector, drmSessionManager);
+                currVideoPlayer.exoPlayer = ExoPlayerFactory.newSimpleInstance(UnityPlayer.currentActivity, new CustomRenderersFactory(UnityPlayer.currentActivity), trackSelector, drmSessionManager);
 
 
                 currVideoPlayer.exoPlayer.addListener(new Player.DefaultEventListener() {
