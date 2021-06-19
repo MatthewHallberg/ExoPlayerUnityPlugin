@@ -11,7 +11,9 @@ static void* g_TextureHandle = NULL;
 static int   g_TextureWidth  = 0;
 static int   g_TextureHeight = 0;
 
-static JavaVM* g_JavaVM = NULL;
+static JavaVM* gJvm = nullptr;
+static jobject gClassLoader;
+static jmethodID gFindClassMethod;
 
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetTextureFromUnity(void* textureHandle, int w, int h) {
     g_TextureHandle = textureHandle;
@@ -24,24 +26,42 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
 static IUnityInterfaces* s_UnityInterfaces = NULL;
 static IUnityGraphics* s_Graphics = NULL;
 
-extern "C" JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
-    g_JavaVM = vm;
+JNIEnv* getEnv() {
+    JNIEnv *env;
+    int status = gJvm->GetEnv((void**)&env, JNI_VERSION_1_6);
+    if(status < 0) {
+        status = gJvm->AttachCurrentThread(&env, NULL);
+        if(status < 0) {
+            return nullptr;
+        }
+    }
+    return env;
+}
+
+JNIEXPORT jint JNI_OnLoad(JavaVM *pjvm, void *reserved) {
+    gJvm = pjvm;  // cache the JavaVM pointer
+    auto env = getEnv();
+    jclass videoClass = env->FindClass("com/matthew/videoplayer/NativeVideoPlayer");
+    jclass videoObject = env->GetObjectClass(videoClass);
+    jclass classLoaderClass = env->FindClass("java/lang/ClassLoader");
+    jmethodID getClassLoaderMethod = env->GetMethodID(videoObject, "getClassLoader",
+                                                 "()Ljava/lang/ClassLoader;");
+    gClassLoader = env->NewGlobalRef(env->CallObjectMethod(videoClass, getClassLoaderMethod));
+    gFindClassMethod = env->GetMethodID(classLoaderClass, "findClass",
+                                        "(Ljava/lang/String;)Ljava/lang/Class;");
     return JNI_VERSION_1_6;
 }
 
+static jclass findClass(const char* name) {
+    return static_cast<jclass>(getEnv()->CallObjectMethod(gClassLoader, gFindClassMethod, getEnv()->NewStringUTF(name)));
+}
+
 static void Log(std::string message){
-
-    JNIEnv* env;
-    int envStat = g_JavaVM->GetEnv((void**)&env, JNI_VERSION_1_6);
-
-    if (envStat == JNI_EDETACHED) {
-        g_JavaVM->AttachCurrentThread(&env, NULL);
-    }
-
+    auto env = getEnv();
+    jclass videoClass = findClass("com/matthew/videoplayer/NativeVideoPlayer");
     jstring logMessage = env->NewStringUTF(message.c_str());
-    jclass clazz = env->FindClass("com/matthew/videoplayer/NativeVideoPlayer");
-    jmethodID mid = env->GetStaticMethodID(clazz, "Log", "(Ljava/lang/String;)V");
-     env->CallStaticVoidMethod(clazz, mid, logMessage);
+    jmethodID mid = env->GetStaticMethodID(videoClass, "Log", "(Ljava/lang/String;)V");
+    env->CallStaticVoidMethod(videoClass, mid, logMessage);
 }
 
 static UnityGfxRenderer s_DeviceType;
@@ -56,7 +76,7 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
 
 static void ModifyTexturePixels() {
 
-    Log("hello");
+    Log("Hello");
 
     void* textureHandle = g_TextureHandle;
     if (!textureHandle)
