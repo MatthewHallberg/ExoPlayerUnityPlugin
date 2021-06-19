@@ -281,10 +281,23 @@ public class NativeVideoPlayer
         }
     }
 
-    public static void playVideo(final String filePath, final String videoID, final int unityTextureID)
+    public static void Log(String message){
+
+        Log.d(TAG, message);
+    }
+
+    public static void playVideo()
     {
 
-        Log.d(TAG, "Texture Pointer: " + unityTextureID);
+        //call function from native C here to get texture handle for this player!
+        final int nativeTextureId = 0;
+
+
+
+        final String videoID = "0";
+        final String filePath = "https://www.matthewhallberg.com/video/holo.mp4";
+
+        Log.d(TAG, "Texture Pointer: " + nativeTextureId);
 
         if (!videoPlayers.containsKey(videoID)){
             VideoPlayer videoPlayer = new VideoPlayer();
@@ -304,12 +317,12 @@ public class NativeVideoPlayer
             EGL14.eglMakeCurrent(unityDisplay, unityDrawSurface, unityReadSurface, unityContext);
 
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
-            GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, unityTextureID);
+            GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, nativeTextureId);
             GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
             GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
             GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
             GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
-            videoPlayer.mSurfaceTexture = new SurfaceTexture(unityTextureID);
+            videoPlayer.mSurfaceTexture = new SurfaceTexture(nativeTextureId);
             videoPlayer.mSurfaceTexture.setDefaultBufferSize(1080, 1920);
             videoPlayer.mSurface = new Surface(videoPlayer.mSurfaceTexture);
             videoPlayer.mSurfaceTexture.setOnFrameAvailableListener(new SurfaceTexture.OnFrameAvailableListener() {

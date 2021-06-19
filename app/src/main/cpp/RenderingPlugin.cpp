@@ -1,15 +1,17 @@
-// Example low level rendering Unity plugin
-
 #include <assert.h>
 #include <math.h>
 #include <vector>
 #include <GLES2/gl2.h>
 #include "Unity/IUnityGraphics.h"
 #include "OpenGL.h"
+#include <jni.h>
+#include <string>
 
 static void* g_TextureHandle = NULL;
 static int   g_TextureWidth  = 0;
 static int   g_TextureHeight = 0;
+
+static JavaVM* g_JavaVM = NULL;
 
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetTextureFromUnity(void* textureHandle, int w, int h) {
     g_TextureHandle = textureHandle;
@@ -22,17 +24,24 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
 static IUnityInterfaces* s_UnityInterfaces = NULL;
 static IUnityGraphics* s_Graphics = NULL;
 
-extern "C" void	UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginLoad(IUnityInterfaces* unityInterfaces) {
-    s_UnityInterfaces = unityInterfaces;
-    s_Graphics = s_UnityInterfaces->Get<IUnityGraphics>();
-    s_Graphics->RegisterDeviceEventCallback(OnGraphicsDeviceEvent);
-
-    // Run OnGraphicsDeviceEvent(initialize) manually on plugin load
-    OnGraphicsDeviceEvent(kUnityGfxDeviceEventInitialize);
+extern "C" JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
+    g_JavaVM = vm;
+    return JNI_VERSION_1_6;
 }
 
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginUnload() {
-    s_Graphics->UnregisterDeviceEventCallback(OnGraphicsDeviceEvent);
+static void Log(std::string message){
+
+    JNIEnv* env;
+    int envStat = g_JavaVM->GetEnv((void**)&env, JNI_VERSION_1_6);
+
+    if (envStat == JNI_EDETACHED) {
+        g_JavaVM->AttachCurrentThread(&env, NULL);
+    }
+
+    jstring logMessage = env->NewStringUTF(message.c_str());
+    jclass clazz = env->FindClass("com/matthew/videoplayer/NativeVideoPlayer");
+    jmethodID mid = env->GetStaticMethodID(clazz, "Log", "(Ljava/lang/String;)V");
+     env->CallStaticVoidMethod(clazz, mid, logMessage);
 }
 
 static UnityGfxRenderer s_DeviceType;
@@ -46,6 +55,9 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
 }
 
 static void ModifyTexturePixels() {
+
+    Log("hello");
+
     void* textureHandle = g_TextureHandle;
     if (!textureHandle)
         return;
@@ -81,4 +93,3 @@ static void UNITY_INTERFACE_API OnRenderEvent(int eventID) {
 extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetRenderEventFunc() {
     return OnRenderEvent;
 }
-
