@@ -282,8 +282,24 @@ public class NativeVideoPlayer
     }
 
     public static void Log(String message){
-
         Log.d(TAG, message);
+    }
+
+    public static void Test(String message){
+        Log.d(TAG, "button Pressed!");
+        PassTexturePointer();
+    }
+
+    //load native library c++
+    static {
+        System.loadLibrary("RenderingPlugin");
+    }
+
+    static native void PassTexturePointer();
+
+    public static void InitPlugin(){
+        Log.d(TAG, "plugin intialized!!!");
+
     }
 
     public static void playVideo()

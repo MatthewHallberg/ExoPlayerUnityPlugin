@@ -64,6 +64,10 @@ static void Log(std::string message){
     env->CallStaticVoidMethod(videoClass, mid, logMessage);
 }
 
+extern "C" JNIEXPORT void JNICALL Java_com_matthew_videoplayer_NativeVideoPlayer_PassTexturePointer(JNIEnv *, jobject){
+    Log("Hello from c++!!!!!!!!!");
+}
+
 static UnityGfxRenderer s_DeviceType;
 
 static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType eventType) {
@@ -74,9 +78,11 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
     ProcessDeviceEvent(eventType, s_UnityInterfaces);
 }
 
-static void ModifyTexturePixels() {
+static void Test(){
+    Log("Hello from Java!");
+}
 
-    Log("Hello");
+static void ModifyTexturePixels() {
 
     void* textureHandle = g_TextureHandle;
     if (!textureHandle)
