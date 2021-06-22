@@ -108,6 +108,7 @@ public class NativeVideoPlayer
         private volatile int stereoMode = -1;
         private volatile int width;
         private volatile int height;
+        private volatile int textureID;
 
         private volatile long duration;
 
@@ -297,23 +298,30 @@ public class NativeVideoPlayer
 
     static native void PassTexturePointer();
 
-    public static void InitPlugin(){
-        Log.d(TAG, "plugin intialized!!!");
-
+    public static void UpdateSurface(){
+        VideoPlayer currVideoPlayer = videoPlayers.get("0");
+        if (currVideoPlayer.updateAvailable){
+            Log.d(TAG, "Updating!!!");
+            currVideoPlayer.mSurfaceTexture.updateTexImage();
+        }
     }
 
-    public static void playVideo()
-    {
+    public static int GetTextureID(){
+        VideoPlayer currVideoPlayer = videoPlayers.get("0");
+        return currVideoPlayer.textureID;
+    }
 
-        //call function from native C here to get texture handle for this player!
-        final int nativeTextureId = 0;
+    static void checkGlError(String op) {
+        int error;
+        while ((error = GLES20.glGetError()) != GLES20.GL_NO_ERROR) {
+            Log.d(TAG, op + ": glError 0x" + Integer.toHexString(error));
+        }
+    }
 
-
+    public static void playVideo(int texID) {
 
         final String videoID = "0";
         final String filePath = "https://www.matthewhallberg.com/video/holo.mp4";
-
-        Log.d(TAG, "Texture Pointer: " + nativeTextureId);
 
         if (!videoPlayers.containsKey(videoID)){
             VideoPlayer videoPlayer = new VideoPlayer();
@@ -332,20 +340,30 @@ public class NativeVideoPlayer
 
             EGL14.eglMakeCurrent(unityDisplay, unityDrawSurface, unityReadSurface, unityContext);
 
+
+            final int nativeTextureId = texID;
+            videoPlayer.textureID = nativeTextureId;
+            Log.d(TAG, "Texture Pointer: " + videoPlayer.textureID);
+
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
             GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, nativeTextureId);
             GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
             GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
             GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
             GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
+
             videoPlayer.mSurfaceTexture = new SurfaceTexture(nativeTextureId);
             videoPlayer.mSurfaceTexture.setDefaultBufferSize(1080, 1920);
             videoPlayer.mSurface = new Surface(videoPlayer.mSurfaceTexture);
             videoPlayer.mSurfaceTexture.setOnFrameAvailableListener(new SurfaceTexture.OnFrameAvailableListener() {
                 @Override
                 public void onFrameAvailable(SurfaceTexture surfaceTexture) {
-                    Log.d(TAG, "Frame Available!!!");
-                    videoPlayer.updateAvailable = true;
+                    getHandler().post( new Runnable() {
+                        @Override
+                        public void run() {
+                            videoPlayer.updateAvailable = true;
+                        }
+                    });
                 }
             });
         }
@@ -450,8 +468,10 @@ public class NativeVideoPlayer
                 // Prepare the player with the source.
                 currVideoPlayer.exoPlayer.prepare(videoSource);
 
-                currVideoPlayer.exoPlayer.setPlayWhenReady( false );
-
+                //currVideoPlayer.exoPlayer.setPlayWhenReady( false );
+                //dev hack
+                currVideoPlayer.exoPlayer.setPlayWhenReady( true );
+                currVideoPlayer.exoPlayer.setRepeatMode( Player.REPEAT_MODE_ONE );
             }
         });
     }
