@@ -306,11 +306,6 @@ public class NativeVideoPlayer
         }
     }
 
-    public static int GetTextureID(){
-        VideoPlayer currVideoPlayer = videoPlayers.get("0");
-        return currVideoPlayer.textureID;
-    }
-
     static void checkGlError(String op) {
         int error;
         while ((error = GLES20.glGetError()) != GLES20.GL_NO_ERROR) {
@@ -318,7 +313,7 @@ public class NativeVideoPlayer
         }
     }
 
-    public static void playVideo(int texID) {
+    public static void playVideo(Surface surface) {
 
         final String videoID = "0";
         final String filePath = "https://www.matthewhallberg.com/video/holo.mp4";
@@ -328,44 +323,7 @@ public class NativeVideoPlayer
             videoPlayers.put(videoID, videoPlayer);
             Log.d(TAG, "Added video player: " + videoID);
 
-            //create surface
-            unityContext = EGL14.eglGetCurrentContext();
-            unityDisplay = EGL14.eglGetCurrentDisplay();
-            unityDrawSurface = EGL14.eglGetCurrentSurface(EGL14.EGL_DRAW);
-            unityReadSurface = EGL14.eglGetCurrentSurface(EGL14.EGL_READ);
-
-            if (unityContext == EGL14.EGL_NO_CONTEXT) {
-                Log.e(TAG, "UnityEGLContext is invalid -> Most probably wrong thread");
-            }
-
-            EGL14.eglMakeCurrent(unityDisplay, unityDrawSurface, unityReadSurface, unityContext);
-
-
-            final int nativeTextureId = texID;
-            videoPlayer.textureID = nativeTextureId;
-            Log.d(TAG, "Texture Pointer: " + videoPlayer.textureID);
-
-            GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
-            GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, nativeTextureId);
-            GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
-            GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
-            GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
-            GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
-
-            videoPlayer.mSurfaceTexture = new SurfaceTexture(nativeTextureId);
-            videoPlayer.mSurfaceTexture.setDefaultBufferSize(1080, 1920);
-            videoPlayer.mSurface = new Surface(videoPlayer.mSurfaceTexture);
-            videoPlayer.mSurfaceTexture.setOnFrameAvailableListener(new SurfaceTexture.OnFrameAvailableListener() {
-                @Override
-                public void onFrameAvailable(SurfaceTexture surfaceTexture) {
-                    getHandler().post( new Runnable() {
-                        @Override
-                        public void run() {
-                            videoPlayer.updateAvailable = true;
-                        }
-                    });
-                }
-            });
+            videoPlayer.mSurface = surface;
         }
 
         VideoPlayer currVideoPlayer = videoPlayers.get(videoID);

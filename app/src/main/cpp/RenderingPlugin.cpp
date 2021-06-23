@@ -20,6 +20,8 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
 static IUnityInterfaces* s_UnityInterfaces = NULL;
 static IUnityGraphics* s_Graphics = NULL;
 
+static jobject jniSurfaceTexture;
+
 JNIEnv* getEnv() {
     JNIEnv *env;
     int status = gJvm->GetEnv((void**)&env, JNI_VERSION_1_6);
@@ -58,19 +60,53 @@ static void Log(std::string message){
     env->CallStaticVoidMethod(videoClass, mid, logMessage);
 }
 
-static void PlayVideo(){
-    auto env = getEnv();
-    jclass videoClass = findClass("com/matthew/videoplayer/NativeVideoPlayer");
-    jint texId = static_cast<int>(reinterpret_cast<std::uintptr_t>(g_TextureHandle));
-    jmethodID mid = env->GetStaticMethodID(videoClass, "playVideo", "(I)V");
-    env->CallStaticVoidMethod(videoClass, mid, texId);
-}
+static void InitVideo(){
 
-static void UpdateAndroidSurface(){
+    auto textureWidth = 1080;
+    auto textureHeight = 1920;
+
+    // Create the texture
+    uint textureID;
+    glGenTextures(1, &textureID);
+    // Bind the texture with the proper external texture target
+    glBindTexture(GL_TEXTURE_EXTERNAL_OES, textureID);
+    glTexParameterf( GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+    glTexParameterf( GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+    glTexParameterf( GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+    glTexParameterf( GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+    glBindTexture( GL_TEXTURE_EXTERNAL_OES, 0 );
+
+    // Retrieve the JNI environment, using SDL, it looks like that
     auto env = getEnv();
+
+    // Create a SurfaceTexture using JNI
+    const jclass surfaceTextureClass = env->FindClass("android/graphics/SurfaceTexture");
+    // Find the constructor that takes an int (texture name)
+    const jmethodID surfaceTextureConstructor = env->GetMethodID(surfaceTextureClass, "<init>", "(I)V" );
+    jobject surfaceTextureObject = env->NewObject(surfaceTextureClass, surfaceTextureConstructor, (int)textureID);
+    jniSurfaceTexture = env->NewGlobalRef(surfaceTextureObject);
+
+    // Don't forget to update the size of the SurfaceTexture
+    jmethodID setDefaultBufferSizeMethodId = env->GetMethodID(surfaceTextureClass, "setDefaultBufferSize", "(II)V" );
+    env->CallVoidMethod(jniSurfaceTexture, setDefaultBufferSizeMethodId, textureWidth, textureHeight);
+
+    //Create a Surface from the SurfaceTexture using JNI
+    const jclass surfaceClass = env->FindClass("android/view/Surface");
+    const jmethodID surfaceConstructor = env->GetMethodID(surfaceClass, "<init>", "(Landroid/graphics/SurfaceTexture;)V");
+    jobject surfaceObject = env->NewObject(surfaceClass, surfaceConstructor, jniSurfaceTexture);
+    jobject jniSurface = env->NewGlobalRef(surfaceObject);
+
+    // Now that we have a globalRef, we can free the localRef
+    env->DeleteLocalRef(surfaceTextureObject);
+    env->DeleteLocalRef(surfaceTextureClass);
+    env->DeleteLocalRef(surfaceObject);
+    env->DeleteLocalRef(surfaceClass);
+
+    // Get the method to pass the Surface object to the videoPlayer
     jclass videoClass = findClass("com/matthew/videoplayer/NativeVideoPlayer");
-    jmethodID mid = env->GetStaticMethodID(videoClass, "UpdateSurface", "()V");
-    env->CallStaticVoidMethod(videoClass, mid);
+    jmethodID playVideoMethodID = env->GetStaticMethodID(videoClass, "playVideo", "(Landroid/view/Surface;)V");
+    // Pass the JNI Surface object to the videoPlayer
+    env->CallStaticVoidMethod(videoClass, playVideoMethodID, jniSurface);
 }
 
 extern "C" JNIEXPORT void JNICALL Java_com_matthew_videoplayer_NativeVideoPlayer_PassTexturePointer(JNIEnv *, jclass){
@@ -85,26 +121,23 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
     }
 }
 
-static void Test(){
-    Log("Hello from Java!");
+static void UpdateAndroidSurface(){
+    //call update on android surface texture object
+    auto env = getEnv();
+    const jclass surfaceTextureClass = env->FindClass("android/graphics/SurfaceTexture");
+    jmethodID updateTexImageMethodId = env->GetMethodID(surfaceTextureClass, "updateTexImage", "()V");
+    env->CallVoidMethod(jniSurfaceTexture, updateTexImageMethodId);
+
+    //copy external OES to texture 2d via framebuffer????
+    
+
+
+
+
 }
 
-static void BindTexture(){
-    void* textureHandle = g_TextureHandle;
-    if (!textureHandle)
-        return;
-
-    GLuint gltex = (GLuint)(size_t)(g_TextureHandle);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_EXTERNAL_OES, gltex);
-    glTexParameterf(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameterf(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-    //glActiveTexture(GL_TEXTURE0);
-    //glBindTexture(GL_TEXTURE_2D, gltex);
-    //glUniform1i(m_UniformFrame, 0);
+static void Test(){
+    Log("Hello from Java!");
 }
 
 static void MakeTextureRed() {
@@ -145,10 +178,10 @@ bool shouldPlay = true;
 static void UNITY_INTERFACE_API OnRenderEvent(int eventID) {
     if (shouldPlay){
         shouldPlay = false;
-        //BindTexture();
-        //PlayVideo();
+        InitVideo();
     }
-    MakeTextureRed();
+    //MakeTextureRed();
+    UpdateAndroidSurface();
 }
 
 extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetRenderEventFunc() {
