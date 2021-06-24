@@ -11,6 +11,8 @@ static void* g_TextureHandle = NULL;
 static int   g_TextureWidth  = 0;
 static int   g_TextureHeight = 0;
 
+static uint textureID;
+
 static JavaVM* gJvm = nullptr;
 static jobject gClassLoader;
 static jmethodID gFindClassMethod;
@@ -66,8 +68,8 @@ static void InitVideo(){
     auto textureHeight = 1920;
 
     // Create the texture
-    uint textureID;
     glGenTextures(1, &textureID);
+    Log("native Texture ID: " + std::to_string((int)textureID));
     // Bind the texture with the proper external texture target
     glBindTexture(GL_TEXTURE_EXTERNAL_OES, textureID);
     glTexParameterf( GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
@@ -121,19 +123,16 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
     }
 }
 
+extern "C" int GetTextureID(){
+    return textureID;
+}
+
 static void UpdateAndroidSurface(){
     //call update on android surface texture object
     auto env = getEnv();
     const jclass surfaceTextureClass = env->FindClass("android/graphics/SurfaceTexture");
     jmethodID updateTexImageMethodId = env->GetMethodID(surfaceTextureClass, "updateTexImage", "()V");
     env->CallVoidMethod(jniSurfaceTexture, updateTexImageMethodId);
-
-    //copy external OES to texture 2d via framebuffer????
-    
-
-
-
-
 }
 
 static void Test(){
