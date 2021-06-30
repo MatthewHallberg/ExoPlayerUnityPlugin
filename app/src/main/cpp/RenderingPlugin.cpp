@@ -64,19 +64,11 @@ static void Log(std::string message){
 
 static void InitVideo(){
 
-    auto textureWidth = 1080;
-    auto textureHeight = 1920;
-
     // Create the texture
     glGenTextures(1, &textureID);
     Log("native Texture ID: " + std::to_string((int)textureID));
     // Bind the texture with the proper external texture target
     glBindTexture(GL_TEXTURE_EXTERNAL_OES, textureID);
-    glTexParameterf( GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-    glTexParameterf( GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-    glTexParameterf( GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-    glTexParameterf( GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-    glBindTexture( GL_TEXTURE_EXTERNAL_OES, 0 );
 
     // Retrieve the JNI environment, using SDL, it looks like that
     auto env = getEnv();
@@ -87,10 +79,6 @@ static void InitVideo(){
     const jmethodID surfaceTextureConstructor = env->GetMethodID(surfaceTextureClass, "<init>", "(I)V" );
     jobject surfaceTextureObject = env->NewObject(surfaceTextureClass, surfaceTextureConstructor, (int)textureID);
     jniSurfaceTexture = env->NewGlobalRef(surfaceTextureObject);
-
-    // Don't forget to update the size of the SurfaceTexture
-    jmethodID setDefaultBufferSizeMethodId = env->GetMethodID(surfaceTextureClass, "setDefaultBufferSize", "(II)V" );
-    env->CallVoidMethod(jniSurfaceTexture, setDefaultBufferSizeMethodId, textureWidth, textureHeight);
 
     //Create a Surface from the SurfaceTexture using JNI
     const jclass surfaceClass = env->FindClass("android/view/Surface");
