@@ -7,10 +7,6 @@
 #include <jni.h>
 #include <string>
 
-static void* g_TextureHandle = NULL;
-static int   g_TextureWidth  = 0;
-static int   g_TextureHeight = 0;
-
 static uint textureID;
 
 static JavaVM* gJvm = nullptr;
@@ -63,7 +59,6 @@ static void Log(std::string message){
 }
 
 static void InitVideo(){
-
     // Create the texture
     glGenTextures(1, &textureID);
     Log("native Texture ID: " + std::to_string((int)textureID));
@@ -99,10 +94,6 @@ static void InitVideo(){
     env->CallStaticVoidMethod(videoClass, playVideoMethodID, jniSurface);
 }
 
-extern "C" JNIEXPORT void JNICALL Java_com_matthew_videoplayer_NativeVideoPlayer_PassTexturePointer(JNIEnv *, jclass){
-    Log("Hello from c++!!!!!!!!!");
-}
-
 static UnityGfxRenderer s_DeviceType;
 
 static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType eventType) {
@@ -123,51 +114,12 @@ static void UpdateAndroidSurface(){
     env->CallVoidMethod(jniSurfaceTexture, updateTexImageMethodId);
 }
 
-static void Test(){
-    Log("Hello from Java!");
-}
-
-static void MakeTextureRed() {
-
-    void* textureHandle = g_TextureHandle;
-    if (!textureHandle)
-        return;
-
-    int textureRowPitch = g_TextureWidth * 4;
-    char* textureDataPtr = new char[textureRowPitch * g_TextureHeight];
-    unsigned char* dst = (unsigned char*)textureDataPtr;
-
-    for (int y = 0; y < g_TextureHeight; ++y) {
-        unsigned char* ptr = dst;
-        for (int x = 0; x < g_TextureWidth; ++x) {
-            ptr[0] = 250;
-            ptr[1] = 0;
-            ptr[2] = 0;
-            ptr[3] = 0;
-            ptr += 4;
-        }
-        dst += textureRowPitch;
-    }
-
-    GLuint gltex = (GLuint)(size_t)(g_TextureHandle);
-    glBindTexture(GL_TEXTURE_2D, gltex);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, g_TextureWidth, g_TextureHeight, GL_RGBA, GL_UNSIGNED_BYTE, textureDataPtr);
-    delete[](unsigned char*)textureDataPtr;
-}
-
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetTextureFromUnity(void* textureHandle, int w, int h) {
-    g_TextureHandle = textureHandle;
-    g_TextureWidth = w;
-    g_TextureHeight = h;
-}
-
 bool shouldPlay = true;
 static void UNITY_INTERFACE_API OnRenderEvent(int eventID) {
     if (shouldPlay){
         shouldPlay = false;
         InitVideo();
     }
-    //MakeTextureRed();
     UpdateAndroidSurface();
 }
 

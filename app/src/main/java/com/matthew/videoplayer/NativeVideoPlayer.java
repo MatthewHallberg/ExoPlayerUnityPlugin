@@ -1,7 +1,6 @@
 package com.matthew.videoplayer;
 
 import android.content.Context;
-import android.graphics.SurfaceTexture;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
@@ -60,6 +59,7 @@ import com.twobigears.audio360.SpatDecoderQueue;
 import com.twobigears.audio360.TBQuat;
 import com.twobigears.audio360exo2.Audio360Sink;
 import com.twobigears.audio360exo2.OpusRenderer;
+
 import java.io.File;
 import java.lang.Math;
 import java.lang.System;
@@ -67,16 +67,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Hashtable;
 import java.util.UUID;
-import android.opengl.EGL14;
-import android.opengl.EGLContext;
-import android.opengl.EGLDisplay;
-import android.opengl.EGLSurface;
-import android.opengl.GLES11Ext;
-import android.opengl.GLES20;
+
 import com.unity3d.player.UnityPlayer;
 
-public class NativeVideoPlayer
-{
+public class NativeVideoPlayer {
     private static final String TAG = "NativeVideoPlayer";
 
     static final float SAMPLE_RATE = 48000.f;
@@ -87,11 +81,6 @@ public class NativeVideoPlayer
     static File downloadDirectory;
     static Cache downloadCache;
 
-    private static EGLContext unityContext = EGL14.EGL_NO_CONTEXT;
-    private static EGLDisplay unityDisplay = EGL14.EGL_NO_DISPLAY;
-    private static EGLSurface unityDrawSurface = EGL14.EGL_NO_SURFACE;
-    private static EGLSurface unityReadSurface = EGL14.EGL_NO_SURFACE;
-
     private static class VideoPlayer {
         private SimpleExoPlayer exoPlayer;
         private AudioEngine engine;
@@ -100,18 +89,13 @@ public class NativeVideoPlayer
         private FrameworkMediaDrm mediaDrm;
 
         private Surface mSurface;
-        private SurfaceTexture mSurfaceTexture;
 
         private volatile boolean isPlaying;
-        private volatile boolean updateAvailable;
         private volatile int currentPlaybackState;
         private volatile int stereoMode = -1;
         private volatile int width;
         private volatile int height;
-        private volatile int textureID;
-
         private volatile long duration;
-
         private volatile long lastPlaybackPosition;
         private volatile long lastPlaybackUpdateTime;
         private volatile float lastPlaybackSpeed;
@@ -129,18 +113,15 @@ public class NativeVideoPlayer
             currPlayer.stereoMode = format.stereoMode;
             currPlayer.width = format.width;
             currPlayer.height = format.height;
-        }
-        else {
+        } else {
             currPlayer.stereoMode = -1;
             currPlayer.width = 0;
             currPlayer.height = 0;
         }
     }
 
-    private static Handler getHandler()
-    {
-        if (handler == null)
-        {
+    private static Handler getHandler() {
+        if (handler == null) {
             handler = new Handler(Looper.getMainLooper());
         }
 
@@ -150,6 +131,7 @@ public class NativeVideoPlayer
     private static class CustomRenderersFactory extends DefaultRenderersFactory {
         private Context myContext;
         private long myAllowedVideoJoiningTimeMs = 5000;
+
         public CustomRenderersFactory(Context context) {
             super(context);
             this.myContext = context;
@@ -225,14 +207,18 @@ public class NativeVideoPlayer
                 /* eventListener= */ null);
     }
 
-    /** Returns a {@link DataSource.Factory}. */
+    /**
+     * Returns a {@link DataSource.Factory}.
+     */
     public static DataSource.Factory buildDataSourceFactory(Context context, VideoPlayer currPlayer) {
         DefaultDataSourceFactory upstreamFactory =
                 new DefaultDataSourceFactory(context, null, buildHttpDataSourceFactory(context));
         return buildReadOnlyCacheDataSource(upstreamFactory, getDownloadCache(context));
     }
 
-    /** Returns a {@link HttpDataSource.Factory}. */
+    /**
+     * Returns a {@link HttpDataSource.Factory}.
+     */
     public static HttpDataSource.Factory buildHttpDataSourceFactory(Context context) {
         return new DefaultHttpDataSourceFactory(Util.getUserAgent(context, "NativeVideoPlayer"));
     }
@@ -252,8 +238,7 @@ public class NativeVideoPlayer
                         keyRequestPropertiesArray[i + 1]);
             }
         }
-        if (currplayer.mediaDrm != null)
-        {
+        if (currplayer.mediaDrm != null) {
             currplayer.mediaDrm.release();
         }
         currplayer.mediaDrm = FrameworkMediaDrm.newInstance(uuid);
@@ -282,35 +267,8 @@ public class NativeVideoPlayer
         }
     }
 
-    public static void Log(String message){
+    public static void Log(String message) {
         Log.d(TAG, message);
-    }
-
-    public static void Test(String message){
-        Log.d(TAG, "button Pressed!");
-        PassTexturePointer();
-    }
-
-    //load native library c++
-    static {
-        System.loadLibrary("RenderingPlugin");
-    }
-
-    static native void PassTexturePointer();
-
-    public static void UpdateSurface(){
-        VideoPlayer currVideoPlayer = videoPlayers.get("0");
-        if (currVideoPlayer.updateAvailable){
-            Log.d(TAG, "Updating!!!");
-            currVideoPlayer.mSurfaceTexture.updateTexImage();
-        }
-    }
-
-    static void checkGlError(String op) {
-        int error;
-        while ((error = GLES20.glGetError()) != GLES20.GL_NO_ERROR) {
-            Log.d(TAG, op + ": glError 0x" + Integer.toHexString(error));
-        }
     }
 
     public static void playVideo(Surface surface) {
@@ -318,7 +276,7 @@ public class NativeVideoPlayer
         final String videoID = "0";
         final String filePath = "https://www.matthewhallberg.com/video/holo.mp4";
 
-        if (!videoPlayers.containsKey(videoID)){
+        if (!videoPlayers.containsKey(videoID)) {
             VideoPlayer videoPlayer = new VideoPlayer();
             videoPlayers.put(videoID, videoPlayer);
             Log.d(TAG, "Added video player: " + videoID);
@@ -329,11 +287,9 @@ public class NativeVideoPlayer
         VideoPlayer currVideoPlayer = videoPlayers.get(videoID);
 
         // set up exoplayer on main thread
-        getHandler().post( new Runnable()
-        {
+        getHandler().post(new Runnable() {
             @Override
-            public void run()
-            {
+            public void run() {
                 // 1. Create a default TrackSelector
                 BandwidthMeter bandwidthMeter = new DefaultBandwidthMeter();
                 TrackSelection.Factory videoTrackSelectionFactory =
@@ -341,20 +297,18 @@ public class NativeVideoPlayer
                 DefaultTrackSelector trackSelector =
                         new DefaultTrackSelector(videoTrackSelectionFactory);
                 // Produces DataSource instances through which media data is loaded.
-                DataSource.Factory dataSourceFactory = buildDataSourceFactory(UnityPlayer.currentActivity,currVideoPlayer);
+                DataSource.Factory dataSourceFactory = buildDataSourceFactory(UnityPlayer.currentActivity, currVideoPlayer);
 
-                Uri uri = Uri.parse( filePath );
+                Uri uri = Uri.parse(filePath);
 
-                if (filePath.startsWith( "jar:file:" )) {
+                if (filePath.startsWith("jar:file:")) {
                     if (filePath.contains(".apk")) { // APK
-                        uri = new Uri.Builder().scheme( "asset" ).path( filePath.substring( filePath.indexOf( "/assets/" ) + "/assets/".length() ) ).build();
-                    }
-                    else if (filePath.contains(".obb")) { // OBB
+                        uri = new Uri.Builder().scheme("asset").path(filePath.substring(filePath.indexOf("/assets/") + "/assets/".length())).build();
+                    } else if (filePath.contains(".obb")) { // OBB
                         String obbPath = filePath.substring(11, filePath.indexOf(".obb") + 4);
 
-                        StorageManager sm = (StorageManager)UnityPlayer.currentActivity.getSystemService(Context.STORAGE_SERVICE);
-                        if (!sm.isObbMounted(obbPath))
-                        {
+                        StorageManager sm = (StorageManager) UnityPlayer.currentActivity.getSystemService(Context.STORAGE_SERVICE);
+                        if (!sm.isObbMounted(obbPath)) {
                             sm.mountObb(obbPath, null, new OnObbStateChangeListener() {
                                 @Override
                                 public void onObbStateChange(String path, int state) {
@@ -363,7 +317,7 @@ public class NativeVideoPlayer
                             });
                         }
 
-                        uri = new Uri.Builder().scheme( "file" ).path( sm.getMountedObbPath(obbPath) + filePath.substring(filePath.indexOf(".obb") + 5) ).build();
+                        uri = new Uri.Builder().scheme("file").path(sm.getMountedObbPath(obbPath) + filePath.substring(filePath.indexOf(".obb") + 5)).build();
                     }
                 }
 
@@ -373,13 +327,12 @@ public class NativeVideoPlayer
                 // This is the MediaSource representing the media to be played.
                 MediaSource videoSource = buildMediaSource(UnityPlayer.currentActivity, uri, null, dataSourceFactory);
 
-                Log.d(TAG, "Requested play of " +filePath + " uri: "+uri.toString());
+                Log.d(TAG, "Requested play of " + filePath + " uri: " + uri.toString());
 
                 // 2. Create the player
                 //--------------------------------------
                 //- Audio Engine
-                if (currVideoPlayer.engine == null)
-                {
+                if (currVideoPlayer.engine == null) {
                     currVideoPlayer.engine = AudioEngine.create(SAMPLE_RATE, BUFFER_SIZE, QUEUE_SIZE_IN_SAMPLES, UnityPlayer.currentActivity);
                     currVideoPlayer.spat = currVideoPlayer.engine.createSpatDecoderQueue();
                     currVideoPlayer.engine.start();
@@ -389,8 +342,7 @@ public class NativeVideoPlayer
                 //- ExoPlayer
 
                 // Create our modified ExoPlayer instance
-                if (currVideoPlayer.exoPlayer != null)
-                {
+                if (currVideoPlayer.exoPlayer != null) {
                     currVideoPlayer.exoPlayer.release();
                 }
                 currVideoPlayer.exoPlayer = ExoPlayerFactory.newSimpleInstance(UnityPlayer.currentActivity, new CustomRenderersFactory(UnityPlayer.currentActivity), trackSelector, drmSessionManager);
@@ -399,8 +351,7 @@ public class NativeVideoPlayer
                 currVideoPlayer.exoPlayer.addListener(new Player.DefaultEventListener() {
 
                     @Override
-                    public void onPlayerStateChanged(boolean playWhenReady, int playbackState)
-                    {
+                    public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
                         currVideoPlayer.isPlaying = playWhenReady && (playbackState == Player.STATE_READY || playbackState == Player.STATE_BUFFERING);
                         currVideoPlayer.currentPlaybackState = playbackState;
 
@@ -408,87 +359,72 @@ public class NativeVideoPlayer
                     }
 
                     @Override
-                    public void onPlaybackParametersChanged(PlaybackParameters params)
-                    {
+                    public void onPlaybackParametersChanged(PlaybackParameters params) {
                         updatePlaybackState(currVideoPlayer);
                     }
 
                     @Override
-                    public void onPositionDiscontinuity(int reason)
-                    {
+                    public void onPositionDiscontinuity(int reason) {
                         updatePlaybackState(currVideoPlayer);
                     }
 
                 });
 
-                currVideoPlayer.exoPlayer.setVideoSurface( currVideoPlayer.mSurface );
+                currVideoPlayer.exoPlayer.setVideoSurface(currVideoPlayer.mSurface);
 
                 // Prepare the player with the source.
                 currVideoPlayer.exoPlayer.prepare(videoSource);
 
                 //currVideoPlayer.exoPlayer.setPlayWhenReady( false );
                 //dev hack
-                currVideoPlayer.exoPlayer.setPlayWhenReady( true );
-                currVideoPlayer.exoPlayer.setRepeatMode( Player.REPEAT_MODE_ONE );
+                currVideoPlayer.exoPlayer.setPlayWhenReady(true);
+                currVideoPlayer.exoPlayer.setRepeatMode(Player.REPEAT_MODE_ONE);
             }
         });
     }
 
-    public static void setLooping(final boolean looping,final String videoID)
-    {
-
-        if (!videoPlayers.containsKey(videoID)){
+    public static void setLooping(final boolean looping, final String videoID) {
+        if (!videoPlayers.containsKey(videoID)) {
             return;
         }
 
         VideoPlayer currVideoPlayer = videoPlayers.get(videoID);
 
-        getHandler().post( new Runnable()
-        {
+        getHandler().post(new Runnable() {
             @Override
-            public void run()
-            {
-                if ( currVideoPlayer.exoPlayer != null )
-                {
-                    if ( looping )
-                    {
-                        currVideoPlayer.exoPlayer.setRepeatMode( Player.REPEAT_MODE_ONE );
-                    }
-                    else
-                    {
-                        currVideoPlayer.exoPlayer.setRepeatMode( Player.REPEAT_MODE_OFF );
+            public void run() {
+                if (currVideoPlayer.exoPlayer != null) {
+                    if (looping) {
+                        currVideoPlayer.exoPlayer.setRepeatMode(Player.REPEAT_MODE_ONE);
+                    } else {
+                        currVideoPlayer.exoPlayer.setRepeatMode(Player.REPEAT_MODE_OFF);
                     }
                 }
             }
         });
     }
 
-    public static void stop(final String videoID)
-    {
+    public static void stop(final String videoID) {
 
-        if (!videoPlayers.containsKey(videoID)){
+        if (!videoPlayers.containsKey(videoID)) {
             return;
         }
 
         VideoPlayer currVideoPlayer = videoPlayers.get(videoID);
 
-        getHandler().post( new Runnable()
-        {
+        getHandler().post(new Runnable() {
             @Override
-            public void run()
-            {
-                if ( currVideoPlayer.exoPlayer != null )
-                {
+            public void run() {
+                if (currVideoPlayer.exoPlayer != null) {
                     currVideoPlayer.exoPlayer.stop();
                     currVideoPlayer.exoPlayer.release();
                     currVideoPlayer.exoPlayer = null;
                 }
-                if ( currVideoPlayer.mediaDrm != null) {
+                if (currVideoPlayer.mediaDrm != null) {
                     currVideoPlayer.mediaDrm.release();
                     currVideoPlayer.mediaDrm = null;
                 }
-                if (currVideoPlayer.engine != null)
-                {
+                if (currVideoPlayer.engine != null) {
                     currVideoPlayer.engine.destroySpatDecoderQueue(currVideoPlayer.spat);
                     currVideoPlayer.engine.delete();
                     currVideoPlayer.spat = null;
@@ -500,63 +436,51 @@ public class NativeVideoPlayer
         });
     }
 
-    public static void pause(final String videoID)
-    {
-        if (!videoPlayers.containsKey(videoID)){
+    public static void pause(final String videoID) {
+        if (!videoPlayers.containsKey(videoID)) {
             return;
         }
 
         VideoPlayer currVideoPlayer = videoPlayers.get(videoID);
 
-        getHandler().post( new Runnable()
-        {
+        getHandler().post(new Runnable() {
             @Override
-            public void run()
-            {
-                if ( currVideoPlayer.exoPlayer != null )
-                {
+            public void run() {
+                if (currVideoPlayer.exoPlayer != null) {
                     currVideoPlayer.exoPlayer.setPlayWhenReady(false);
                 }
             }
         });
     }
 
-    public static void resume(final String videoID)
-    {
-        if (!videoPlayers.containsKey(videoID)){
+    public static void resume(final String videoID) {
+        if (!videoPlayers.containsKey(videoID)) {
             return;
         }
 
         VideoPlayer currVideoPlayer = videoPlayers.get(videoID);
 
-        getHandler().post( new Runnable()
-        {
+        getHandler().post(new Runnable() {
             @Override
-            public void run()
-            {
-                if ( currVideoPlayer.exoPlayer != null )
-                {
+            public void run() {
+                if (currVideoPlayer.exoPlayer != null) {
                     currVideoPlayer.exoPlayer.setPlayWhenReady(true);
                 }
             }
         });
     }
 
-    public static void setPlaybackSpeed(final float speed,final String videoID)
-    {
-        if (!videoPlayers.containsKey(videoID)){
+    public static void setPlaybackSpeed(final float speed, final String videoID) {
+        if (!videoPlayers.containsKey(videoID)) {
             return;
         }
 
         VideoPlayer currVideoPlayer = videoPlayers.get(videoID);
 
-        getHandler().post( new Runnable()
-        {
+        getHandler().post(new Runnable() {
             @Override
-            public void run()
-            {
-                if ( currVideoPlayer.exoPlayer != null )
-                {
+            public void run() {
+                if (currVideoPlayer.exoPlayer != null) {
                     PlaybackParameters param = new PlaybackParameters(speed);
                     currVideoPlayer.exoPlayer.setPlaybackParameters(param);
                 }
@@ -564,23 +488,20 @@ public class NativeVideoPlayer
         });
     }
 
-    public static void setListenerRotationQuaternion(float x, float y, float z, float w, final String videoID)
-    {
-        if (!videoPlayers.containsKey(videoID)){
+    public static void setListenerRotationQuaternion(float x, float y, float z, float w, final String videoID) {
+        if (!videoPlayers.containsKey(videoID)) {
             return;
         }
 
         VideoPlayer currVideoPlayer = videoPlayers.get(videoID);
 
-        if (currVideoPlayer.engine != null)
-        {
-            currVideoPlayer.engine.setListenerRotation(new TBQuat(x,y,z,w));
+        if (currVideoPlayer.engine != null) {
+            currVideoPlayer.engine.setListenerRotation(new TBQuat(x, y, z, w));
         }
     }
 
-    public static boolean getIsPlaying(final String videoID)
-    {
-        if (!videoPlayers.containsKey(videoID)){
+    public static boolean getIsPlaying(final String videoID) {
+        if (!videoPlayers.containsKey(videoID)) {
             return false;
         }
 
@@ -589,9 +510,8 @@ public class NativeVideoPlayer
         return currVideoPlayer.isPlaying;
     }
 
-    public static int getCurrentPlaybackState(final String videoID)
-    {
-        if (!videoPlayers.containsKey(videoID)){
+    public static int getCurrentPlaybackState(final String videoID) {
+        if (!videoPlayers.containsKey(videoID)) {
             return 0;
         }
 
@@ -599,9 +519,8 @@ public class NativeVideoPlayer
         return currVideoPlayer.currentPlaybackState;
     }
 
-    public static long getDuration(final String videoID)
-    {
-        if (!videoPlayers.containsKey(videoID)){
+    public static long getDuration(final String videoID) {
+        if (!videoPlayers.containsKey(videoID)) {
             return 0;
         }
 
@@ -609,9 +528,8 @@ public class NativeVideoPlayer
         return currVideoPlayer.duration;
     }
 
-    public static int getStereoMode(final String videoID)
-    {
-        if (!videoPlayers.containsKey(videoID)){
+    public static int getStereoMode(final String videoID) {
+        if (!videoPlayers.containsKey(videoID)) {
             return 0;
         }
 
@@ -619,9 +537,8 @@ public class NativeVideoPlayer
         return currVideoPlayer.stereoMode;
     }
 
-    public static int getWidth(final String videoID)
-    {
-        if (!videoPlayers.containsKey(videoID)){
+    public static int getWidth(final String videoID) {
+        if (!videoPlayers.containsKey(videoID)) {
             return 0;
         }
 
@@ -629,9 +546,8 @@ public class NativeVideoPlayer
         return currVideoPlayer.width;
     }
 
-    public static int getHeight(final String videoID)
-    {
-        if (!videoPlayers.containsKey(videoID)){
+    public static int getHeight(final String videoID) {
+        if (!videoPlayers.containsKey(videoID)) {
             return 0;
         }
 
@@ -639,44 +555,36 @@ public class NativeVideoPlayer
         return currVideoPlayer.height;
     }
 
-    public static long getPlaybackPosition(final String videoID)
-    {
-        if (!videoPlayers.containsKey(videoID)){
+    public static long getPlaybackPosition(final String videoID) {
+        if (!videoPlayers.containsKey(videoID)) {
             return 0;
         }
 
         VideoPlayer currVideoPlayer = videoPlayers.get(videoID);
-        return Math.max(0, Math.min(currVideoPlayer.duration, currVideoPlayer.lastPlaybackPosition + (long)((System.currentTimeMillis() - currVideoPlayer.lastPlaybackUpdateTime) * currVideoPlayer.lastPlaybackSpeed)));
+        return Math.max(0, Math.min(currVideoPlayer.duration, currVideoPlayer.lastPlaybackPosition + (long) ((System.currentTimeMillis() - currVideoPlayer.lastPlaybackUpdateTime) * currVideoPlayer.lastPlaybackSpeed)));
     }
 
-    public static void setPlaybackPosition(final long position,final String videoID)
-    {
-        if (!videoPlayers.containsKey(videoID)){
+    public static void setPlaybackPosition(final long position, final String videoID) {
+        if (!videoPlayers.containsKey(videoID)) {
             return;
         }
 
         VideoPlayer currVideoPlayer = videoPlayers.get(videoID);
 
-        getHandler().post( new Runnable()
-        {
+        getHandler().post(new Runnable() {
             @Override
-            public void run()
-            {
-                if ( currVideoPlayer.exoPlayer != null )
-                {
+            public void run() {
+                if (currVideoPlayer.exoPlayer != null) {
                     Timeline timeline = currVideoPlayer.exoPlayer.getCurrentTimeline();
-                    if ( timeline != null )
-                    {
+                    if (timeline != null) {
                         int windowIndex = timeline.getFirstWindowIndex(false);
                         long windowPositionUs = position * 1000L;
                         Timeline.Window tmpWindow = new Timeline.Window();
-                        for(int i = timeline.getFirstWindowIndex(false);
-                            i < timeline.getLastWindowIndex(false); i++)
-                        {
+                        for (int i = timeline.getFirstWindowIndex(false);
+                             i < timeline.getLastWindowIndex(false); i++) {
                             timeline.getWindow(i, tmpWindow);
 
-                            if (tmpWindow.durationUs > windowPositionUs)
-                            {
+                            if (tmpWindow.durationUs > windowPositionUs) {
                                 break;
                             }
 
