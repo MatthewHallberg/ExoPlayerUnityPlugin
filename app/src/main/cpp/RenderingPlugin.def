@@ -3,6 +3,4 @@ LIBRARY
 EXPORTS
    UnityPluginLoad
    UnityPluginUnload
-   SetTextureFromUnity
    GetRenderEventFunc
-   GetTextureID

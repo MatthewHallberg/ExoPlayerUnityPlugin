@@ -87,9 +87,8 @@ public class NativeVideoPlayer {
         private SpatDecoderQueue spat;
         private AudioSink audio360Sink;
         private FrameworkMediaDrm mediaDrm;
-
         private Surface mSurface;
-
+        private String filePath;
         private volatile boolean isPlaying;
         private volatile int currentPlaybackState;
         private volatile int stereoMode = -1;
@@ -271,20 +270,26 @@ public class NativeVideoPlayer {
         Log.d(TAG, message);
     }
 
-    public static void playVideo(Surface surface) {
-
-        final String videoID = "0";
-        final String filePath = "https://www.matthewhallberg.com/video/holo.mp4";
-
+    public static void Prepare(String videoID, String filePath){
         if (!videoPlayers.containsKey(videoID)) {
             VideoPlayer videoPlayer = new VideoPlayer();
+            videoPlayer.filePath = filePath;
             videoPlayers.put(videoID, videoPlayer);
             Log.d(TAG, "Added video player: " + videoID);
+        }
+    }
 
-            videoPlayer.mSurface = surface;
+    public static void CreateSurface(Surface surface, String videoID, String textureID) {
+
+        if (!videoPlayers.containsKey(videoID)) {
+            return;
         }
 
+        //send videoID and textureID back to unity to create external texture
+        UnityPlayer.UnitySendMessage("ExoPlayerUnity", "CreateOESTexture", videoID + "," + textureID);
+
         VideoPlayer currVideoPlayer = videoPlayers.get(videoID);
+        currVideoPlayer.mSurface = surface;
 
         // set up exoplayer on main thread
         getHandler().post(new Runnable() {
@@ -299,13 +304,13 @@ public class NativeVideoPlayer {
                 // Produces DataSource instances through which media data is loaded.
                 DataSource.Factory dataSourceFactory = buildDataSourceFactory(UnityPlayer.currentActivity, currVideoPlayer);
 
-                Uri uri = Uri.parse(filePath);
+                Uri uri = Uri.parse(currVideoPlayer.filePath);
 
-                if (filePath.startsWith("jar:file:")) {
-                    if (filePath.contains(".apk")) { // APK
-                        uri = new Uri.Builder().scheme("asset").path(filePath.substring(filePath.indexOf("/assets/") + "/assets/".length())).build();
-                    } else if (filePath.contains(".obb")) { // OBB
-                        String obbPath = filePath.substring(11, filePath.indexOf(".obb") + 4);
+                if (currVideoPlayer.filePath.startsWith("jar:file:")) {
+                    if (currVideoPlayer.filePath.contains(".apk")) { // APK
+                        uri = new Uri.Builder().scheme("asset").path(currVideoPlayer.filePath.substring(currVideoPlayer.filePath.indexOf("/assets/") + "/assets/".length())).build();
+                    } else if (currVideoPlayer.filePath.contains(".obb")) { // OBB
+                        String obbPath = currVideoPlayer.filePath.substring(11, currVideoPlayer.filePath.indexOf(".obb") + 4);
 
                         StorageManager sm = (StorageManager) UnityPlayer.currentActivity.getSystemService(Context.STORAGE_SERVICE);
                         if (!sm.isObbMounted(obbPath)) {
@@ -317,7 +322,7 @@ public class NativeVideoPlayer {
                             });
                         }
 
-                        uri = new Uri.Builder().scheme("file").path(sm.getMountedObbPath(obbPath) + filePath.substring(filePath.indexOf(".obb") + 5)).build();
+                        uri = new Uri.Builder().scheme("file").path(sm.getMountedObbPath(obbPath) + currVideoPlayer.filePath.substring(currVideoPlayer.filePath.indexOf(".obb") + 5)).build();
                     }
                 }
 
@@ -327,19 +332,13 @@ public class NativeVideoPlayer {
                 // This is the MediaSource representing the media to be played.
                 MediaSource videoSource = buildMediaSource(UnityPlayer.currentActivity, uri, null, dataSourceFactory);
 
-                Log.d(TAG, "Requested play of " + filePath + " uri: " + uri.toString());
+                Log.d(TAG, "Requested play of " + currVideoPlayer.filePath + " uri: " + uri.toString());
 
-                // 2. Create the player
-                //--------------------------------------
-                //- Audio Engine
                 if (currVideoPlayer.engine == null) {
                     currVideoPlayer.engine = AudioEngine.create(SAMPLE_RATE, BUFFER_SIZE, QUEUE_SIZE_IN_SAMPLES, UnityPlayer.currentActivity);
                     currVideoPlayer.spat = currVideoPlayer.engine.createSpatDecoderQueue();
                     currVideoPlayer.engine.start();
                 }
-
-                //--------------------------------------
-                //- ExoPlayer
 
                 // Create our modified ExoPlayer instance
                 if (currVideoPlayer.exoPlayer != null) {
@@ -347,14 +346,12 @@ public class NativeVideoPlayer {
                 }
                 currVideoPlayer.exoPlayer = ExoPlayerFactory.newSimpleInstance(UnityPlayer.currentActivity, new CustomRenderersFactory(UnityPlayer.currentActivity), trackSelector, drmSessionManager);
 
-
                 currVideoPlayer.exoPlayer.addListener(new Player.DefaultEventListener() {
 
                     @Override
                     public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
                         currVideoPlayer.isPlaying = playWhenReady && (playbackState == Player.STATE_READY || playbackState == Player.STATE_BUFFERING);
                         currVideoPlayer.currentPlaybackState = playbackState;
-
                         updatePlaybackState(currVideoPlayer);
                     }
 
@@ -367,7 +364,6 @@ public class NativeVideoPlayer {
                     public void onPositionDiscontinuity(int reason) {
                         updatePlaybackState(currVideoPlayer);
                     }
-
                 });
 
                 currVideoPlayer.exoPlayer.setVideoSurface(currVideoPlayer.mSurface);
@@ -375,15 +371,14 @@ public class NativeVideoPlayer {
                 // Prepare the player with the source.
                 currVideoPlayer.exoPlayer.prepare(videoSource);
 
-                //currVideoPlayer.exoPlayer.setPlayWhenReady( false );
                 //dev hack
-                currVideoPlayer.exoPlayer.setPlayWhenReady(true);
                 currVideoPlayer.exoPlayer.setRepeatMode(Player.REPEAT_MODE_ONE);
+                currVideoPlayer.exoPlayer.setPlayWhenReady(false);
             }
         });
     }
 
-    public static void setLooping(final boolean looping, final String videoID) {
+    public static void SetLooping(final boolean looping, final String videoID) {
         if (!videoPlayers.containsKey(videoID)) {
             return;
         }
@@ -404,7 +399,7 @@ public class NativeVideoPlayer {
         });
     }
 
-    public static void stop(final String videoID) {
+    public static void Stop(final String videoID) {
 
         if (!videoPlayers.containsKey(videoID)) {
             return;
@@ -436,7 +431,7 @@ public class NativeVideoPlayer {
         });
     }
 
-    public static void pause(final String videoID) {
+    public static void Pause(final String videoID) {
         if (!videoPlayers.containsKey(videoID)) {
             return;
         }
@@ -453,7 +448,7 @@ public class NativeVideoPlayer {
         });
     }
 
-    public static void resume(final String videoID) {
+    public static void Play(final String videoID) {
         if (!videoPlayers.containsKey(videoID)) {
             return;
         }
@@ -470,7 +465,7 @@ public class NativeVideoPlayer {
         });
     }
 
-    public static void setPlaybackSpeed(final float speed, final String videoID) {
+    public static void SetPlaybackSpeed(final float speed, final String videoID) {
         if (!videoPlayers.containsKey(videoID)) {
             return;
         }
@@ -488,19 +483,7 @@ public class NativeVideoPlayer {
         });
     }
 
-    public static void setListenerRotationQuaternion(float x, float y, float z, float w, final String videoID) {
-        if (!videoPlayers.containsKey(videoID)) {
-            return;
-        }
-
-        VideoPlayer currVideoPlayer = videoPlayers.get(videoID);
-
-        if (currVideoPlayer.engine != null) {
-            currVideoPlayer.engine.setListenerRotation(new TBQuat(x, y, z, w));
-        }
-    }
-
-    public static boolean getIsPlaying(final String videoID) {
+    public static boolean GetIsPlaying(final String videoID) {
         if (!videoPlayers.containsKey(videoID)) {
             return false;
         }
@@ -510,7 +493,7 @@ public class NativeVideoPlayer {
         return currVideoPlayer.isPlaying;
     }
 
-    public static int getCurrentPlaybackState(final String videoID) {
+    public static int GetCurrentPlaybackState(final String videoID) {
         if (!videoPlayers.containsKey(videoID)) {
             return 0;
         }
@@ -519,7 +502,7 @@ public class NativeVideoPlayer {
         return currVideoPlayer.currentPlaybackState;
     }
 
-    public static long getDuration(final String videoID) {
+    public static long GetDuration(final String videoID) {
         if (!videoPlayers.containsKey(videoID)) {
             return 0;
         }
@@ -528,7 +511,7 @@ public class NativeVideoPlayer {
         return currVideoPlayer.duration;
     }
 
-    public static int getStereoMode(final String videoID) {
+    public static int GetStereoMode(final String videoID) {
         if (!videoPlayers.containsKey(videoID)) {
             return 0;
         }
@@ -537,7 +520,7 @@ public class NativeVideoPlayer {
         return currVideoPlayer.stereoMode;
     }
 
-    public static int getWidth(final String videoID) {
+    public static int GetWidth(final String videoID) {
         if (!videoPlayers.containsKey(videoID)) {
             return 0;
         }
@@ -546,7 +529,7 @@ public class NativeVideoPlayer {
         return currVideoPlayer.width;
     }
 
-    public static int getHeight(final String videoID) {
+    public static int GetHeight(final String videoID) {
         if (!videoPlayers.containsKey(videoID)) {
             return 0;
         }
@@ -555,7 +538,7 @@ public class NativeVideoPlayer {
         return currVideoPlayer.height;
     }
 
-    public static long getPlaybackPosition(final String videoID) {
+    public static long GetPlaybackPosition(final String videoID) {
         if (!videoPlayers.containsKey(videoID)) {
             return 0;
         }
@@ -564,7 +547,7 @@ public class NativeVideoPlayer {
         return Math.max(0, Math.min(currVideoPlayer.duration, currVideoPlayer.lastPlaybackPosition + (long) ((System.currentTimeMillis() - currVideoPlayer.lastPlaybackUpdateTime) * currVideoPlayer.lastPlaybackSpeed)));
     }
 
-    public static void setPlaybackPosition(final long position, final String videoID) {
+    public static void GetPlaybackPosition(final long position, final String videoID) {
         if (!videoPlayers.containsKey(videoID)) {
             return;
         }
