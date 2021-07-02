@@ -6,8 +6,7 @@
 #include "Unity/IUnityGraphics.h"
 #include <jni.h>
 #include <string>
-
-static uint textureID;
+#include <list>
 
 static JavaVM* gJvm = nullptr;
 static jobject gClassLoader;
@@ -18,7 +17,7 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
 static IUnityInterfaces* s_UnityInterfaces = NULL;
 static IUnityGraphics* s_Graphics = NULL;
 
-static jobject jniSurfaceTexture;
+static std::list<jobject> surfaceTextures;
 
 JNIEnv* getEnv() {
     JNIEnv *env;
@@ -60,6 +59,7 @@ static void Log(std::string message){
 
 static void CreateSurfaceTexture(int videoID){
     // Create the texture
+    uint textureID;
     glGenTextures(1, &textureID);
     Log("native Texture ID: " + std::to_string((int)textureID));
     // Bind the texture with the proper external texture target
@@ -73,7 +73,9 @@ static void CreateSurfaceTexture(int videoID){
     // Find the constructor that takes an int (texture name)
     const jmethodID surfaceTextureConstructor = env->GetMethodID(surfaceTextureClass, "<init>", "(I)V" );
     jobject surfaceTextureObject = env->NewObject(surfaceTextureClass, surfaceTextureConstructor, (int)textureID);
-    jniSurfaceTexture = env->NewGlobalRef(surfaceTextureObject);
+    jobject jniSurfaceTexture = env->NewGlobalRef(surfaceTextureObject);
+    //add to list so we can iterate through and update all
+    surfaceTextures.push_back(jniSurfaceTexture);
 
     //Create a Surface from the SurfaceTexture using JNI
     const jclass surfaceClass = env->FindClass("android/view/Surface");
@@ -91,10 +93,10 @@ static void CreateSurfaceTexture(int videoID){
     jclass videoClass = findClass("com/matthew/videoplayer/NativeVideoPlayer");
     jstring videoPlayerID = env->NewStringUTF(std::to_string(videoID).c_str());
     int textureNum = (int)textureID;
-    jstring textureID = env->NewStringUTF(std::to_string(textureNum).c_str());
+    jstring textureIDString = env->NewStringUTF(std::to_string(textureNum).c_str());
     jmethodID playVideoMethodID = env->GetStaticMethodID(videoClass, "CreateSurface", "(Landroid/view/Surface;Ljava/lang/String;Ljava/lang/String;)V");
     // Pass the JNI Surface object to the videoPlayer with video and texture ID
-    env->CallStaticVoidMethod(videoClass, playVideoMethodID, jniSurface, videoPlayerID, textureID);
+    env->CallStaticVoidMethod(videoClass, playVideoMethodID, jniSurface, videoPlayerID, textureIDString);
 }
 
 static UnityGfxRenderer s_DeviceType;
@@ -105,20 +107,20 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
     }
 }
 
-static void UpdateAndroidSurface(){
-
-    //TODO: loop through all active textures and update
-
+static void UpdateAndroidSurfaces(){
     //call update on android surface texture object
-    //auto env = getEnv();
-    //const jclass surfaceTextureClass = env->FindClass("android/graphics/SurfaceTexture");
-    //jmethodID updateTexImageMethodId = env->GetMethodID(surfaceTextureClass, "updateTexImage", "()V");
-    //env->CallVoidMethod(jniSurfaceTexture, updateTexImageMethodId);
+    auto env = getEnv();
+    const jclass surfaceTextureClass = env->FindClass("android/graphics/SurfaceTexture");
+    jmethodID updateTexImageMethodId = env->GetMethodID(surfaceTextureClass, "updateTexImage", "()V");
+
+    for (jobject surfaceTex : surfaceTextures) {
+        env->CallVoidMethod(surfaceTex, updateTexImageMethodId);
+    }
 }
 
 static void UNITY_INTERFACE_API OnRenderEvent(int eventID) {
     if (eventID == -1){
-        UpdateAndroidSurface();
+        UpdateAndroidSurfaces();
     } else {
         CreateSurfaceTexture(eventID);
     }

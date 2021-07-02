@@ -89,6 +89,7 @@ public class NativeVideoPlayer {
         private FrameworkMediaDrm mediaDrm;
         private Surface mSurface;
         private String filePath;
+        private boolean readyToPlay;
         private volatile boolean isPlaying;
         private volatile int currentPlaybackState;
         private volatile int stereoMode = -1;
@@ -350,6 +351,13 @@ public class NativeVideoPlayer {
 
                     @Override
                     public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+
+                        //call on prepared from unity
+                        if (!currVideoPlayer.readyToPlay && playbackState == Player.STATE_READY){
+                            currVideoPlayer.readyToPlay = true;
+                            UnityPlayer.UnitySendMessage("ExoPlayerUnity", "OnVideoPrepared", videoID);
+                        }
+
                         currVideoPlayer.isPlaying = playWhenReady && (playbackState == Player.STATE_READY || playbackState == Player.STATE_BUFFERING);
                         currVideoPlayer.currentPlaybackState = playbackState;
                         updatePlaybackState(currVideoPlayer);
