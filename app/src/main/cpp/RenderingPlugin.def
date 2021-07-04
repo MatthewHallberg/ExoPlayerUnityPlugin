@@ -4,3 +4,4 @@ EXPORTS
    UnityPluginLoad
    UnityPluginUnload
    GetRenderEventFunc
+   DeleteSurfaceID

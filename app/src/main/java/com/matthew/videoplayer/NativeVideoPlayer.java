@@ -547,7 +547,7 @@ public class NativeVideoPlayer {
         return percent;
     }
 
-    public static void SetPlaybackPosition(final long position, final String videoID) {
+    public static void SetPlaybackPosition(final double percent, final String videoID) {
         if (!videoPlayers.containsKey(videoID)) {
             return;
         }
@@ -560,8 +560,11 @@ public class NativeVideoPlayer {
                 if (currVideoPlayer.exoPlayer != null) {
                     Timeline timeline = currVideoPlayer.exoPlayer.getCurrentTimeline();
                     if (timeline != null) {
+
+                        long timeInMilliseconds = (long)(currVideoPlayer.duration * percent);
+
                         int windowIndex = timeline.getFirstWindowIndex(false);
-                        long windowPositionUs = position * 1000L;
+                        long windowPositionUs = timeInMilliseconds * 1000L;
                         Timeline.Window tmpWindow = new Timeline.Window();
                         for (int i = timeline.getFirstWindowIndex(false);
                              i < timeline.getLastWindowIndex(false); i++) {

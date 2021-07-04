@@ -7,6 +7,7 @@
 #include <jni.h>
 #include <string>
 #include <list>
+#include <map>
 
 static JavaVM* gJvm = nullptr;
 static jobject gClassLoader;
@@ -17,7 +18,8 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
 static IUnityInterfaces* s_UnityInterfaces = NULL;
 static IUnityGraphics* s_Graphics = NULL;
 
-static std::list<jobject> surfaceTextures;
+static std::map<int, jobject> surfaceTextures;
+static std::map<int, jobject>::iterator it;
 
 JNIEnv* getEnv() {
     JNIEnv *env;
@@ -74,8 +76,8 @@ static void CreateSurfaceTexture(int videoID){
     const jmethodID surfaceTextureConstructor = env->GetMethodID(surfaceTextureClass, "<init>", "(I)V" );
     jobject surfaceTextureObject = env->NewObject(surfaceTextureClass, surfaceTextureConstructor, (int)textureID);
     jobject jniSurfaceTexture = env->NewGlobalRef(surfaceTextureObject);
-    //add to list so we can iterate through and update all
-    surfaceTextures.push_back(jniSurfaceTexture);
+    //add to map so we can iterate through and update all
+    surfaceTextures[(int)textureID] = jniSurfaceTexture;
 
     //Create a Surface from the SurfaceTexture using JNI
     const jclass surfaceClass = env->FindClass("android/view/Surface");
@@ -107,14 +109,25 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
     }
 }
 
+extern "C" void DeleteSurfaceID(int surfaceID){
+    Log("Deleting External ID: " + std::to_string(surfaceID));
+    auto env = getEnv();
+    jobject surface = surfaceTextures[surfaceID];
+    //remove from map so it doesnt get updated
+    surfaceTextures.erase(surfaceID);
+    //delete global ref
+    env->DeleteGlobalRef(surface);
+}
+
 static void UpdateAndroidSurfaces(){
     //call update on android surface texture object
     auto env = getEnv();
     const jclass surfaceTextureClass = env->FindClass("android/graphics/SurfaceTexture");
     jmethodID updateTexImageMethodId = env->GetMethodID(surfaceTextureClass, "updateTexImage", "()V");
 
-    for (jobject surfaceTex : surfaceTextures) {
-        env->CallVoidMethod(surfaceTex, updateTexImageMethodId);
+    //iterate through map to update textures
+    for (it = surfaceTextures.begin(); it != surfaceTextures.end(); it++) {
+        env->CallVoidMethod(it->second, updateTexImageMethodId);
     }
 }
 
