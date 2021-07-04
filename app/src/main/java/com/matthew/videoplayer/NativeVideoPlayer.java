@@ -497,7 +497,6 @@ public class NativeVideoPlayer {
         }
 
         VideoPlayer currVideoPlayer = videoPlayers.get(videoID);
-
         return currVideoPlayer.isPlaying;
     }
 
@@ -510,7 +509,7 @@ public class NativeVideoPlayer {
         return currVideoPlayer.currentPlaybackState;
     }
 
-    public static long GetDuration(final String videoID) {
+    public static long GetLength(final String videoID) {
         if (!videoPlayers.containsKey(videoID)) {
             return 0;
         }
@@ -537,16 +536,18 @@ public class NativeVideoPlayer {
         return currVideoPlayer.height;
     }
 
-    public static long GetPlaybackPosition(final String videoID) {
+    public static double GetPlaybackPosition(final String videoID) {
         if (!videoPlayers.containsKey(videoID)) {
             return 0;
         }
 
         VideoPlayer currVideoPlayer = videoPlayers.get(videoID);
-        return Math.max(0, Math.min(currVideoPlayer.duration, currVideoPlayer.lastPlaybackPosition + (long) ((System.currentTimeMillis() - currVideoPlayer.lastPlaybackUpdateTime) * currVideoPlayer.lastPlaybackSpeed)));
+        long currPosition = Math.max(0, Math.min(currVideoPlayer.duration, currVideoPlayer.lastPlaybackPosition + (long) ((System.currentTimeMillis() - currVideoPlayer.lastPlaybackUpdateTime) * currVideoPlayer.lastPlaybackSpeed)));
+        double percent = (double)currPosition / currVideoPlayer.duration;
+        return percent;
     }
 
-    public static void GetPlaybackPosition(final long position, final String videoID) {
+    public static void SetPlaybackPosition(final long position, final String videoID) {
         if (!videoPlayers.containsKey(videoID)) {
             return;
         }
