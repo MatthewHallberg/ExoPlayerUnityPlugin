@@ -519,15 +519,6 @@ public class NativeVideoPlayer {
         return currVideoPlayer.duration;
     }
 
-    public static int GetStereoMode(final String videoID) {
-        if (!videoPlayers.containsKey(videoID)) {
-            return 0;
-        }
-
-        VideoPlayer currVideoPlayer = videoPlayers.get(videoID);
-        return currVideoPlayer.stereoMode;
-    }
-
     public static int GetWidth(final String videoID) {
         if (!videoPlayers.containsKey(videoID)) {
             return 0;
