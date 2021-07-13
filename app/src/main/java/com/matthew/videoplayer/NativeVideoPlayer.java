@@ -286,9 +286,6 @@ public class NativeVideoPlayer {
             return;
         }
 
-        //send videoID and textureID back to unity to create external texture
-        UnityPlayer.UnitySendMessage("ExoPlayerUnity", "CreateOESTexture", videoID + "," + textureID);
-
         VideoPlayer currVideoPlayer = videoPlayers.get(videoID);
         currVideoPlayer.mSurface = surface;
 

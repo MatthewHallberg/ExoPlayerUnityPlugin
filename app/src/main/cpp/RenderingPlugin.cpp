@@ -20,6 +20,9 @@ static IUnityGraphics* s_Graphics = NULL;
 
 static std::map<int, jobject> surfaceTextures;
 static std::map<int, jobject>::iterator it;
+static int unityID;
+static uint externalID;
+static uint fbo;
 
 JNIEnv* getEnv() {
     JNIEnv *env;
@@ -60,12 +63,15 @@ static void Log(std::string message){
 }
 
 static void CreateSurfaceTexture(int videoID){
-    // Create the texture
-    uint textureID;
-    glGenTextures(1, &textureID);
-    Log("native Texture ID: " + std::to_string((int)textureID));
-    // Bind the texture with the proper external texture target
-    glBindTexture(GL_TEXTURE_EXTERNAL_OES, textureID);
+    // Create the texture for Android Surface
+    glGenTextures(1, &externalID);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_EXTERNAL_OES, externalID);
+    glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindTexture( GL_TEXTURE_EXTERNAL_OES, 0 );
 
     // Retrieve the JNI environment, using SDL, it looks like that
     auto env = getEnv();
@@ -74,10 +80,10 @@ static void CreateSurfaceTexture(int videoID){
     const jclass surfaceTextureClass = env->FindClass("android/graphics/SurfaceTexture");
     // Find the constructor that takes an int (texture name)
     const jmethodID surfaceTextureConstructor = env->GetMethodID(surfaceTextureClass, "<init>", "(I)V" );
-    jobject surfaceTextureObject = env->NewObject(surfaceTextureClass, surfaceTextureConstructor, (int)textureID);
+    jobject surfaceTextureObject = env->NewObject(surfaceTextureClass, surfaceTextureConstructor, (int)externalID);
     jobject jniSurfaceTexture = env->NewGlobalRef(surfaceTextureObject);
     //add to map so we can iterate through and update all
-    surfaceTextures[(int)textureID] = jniSurfaceTexture;
+    surfaceTextures[(int)externalID] = jniSurfaceTexture;
 
     //Create a Surface from the SurfaceTexture using JNI
     const jclass surfaceClass = env->FindClass("android/view/Surface");
@@ -94,11 +100,11 @@ static void CreateSurfaceTexture(int videoID){
     // Get the method to pass the Surface object to the videoPlayer
     jclass videoClass = findClass("com/matthew/videoplayer/NativeVideoPlayer");
     jstring videoPlayerID = env->NewStringUTF(std::to_string(videoID).c_str());
-    int textureNum = (int)textureID;
+    int textureNum = (int)externalID;
     jstring textureIDString = env->NewStringUTF(std::to_string(textureNum).c_str());
-    jmethodID playVideoMethodID = env->GetStaticMethodID(videoClass, "CreateSurface", "(Landroid/view/Surface;Ljava/lang/String;Ljava/lang/String;)V");
+    jmethodID createSurfaceVideoMethodID = env->GetStaticMethodID(videoClass, "CreateSurface", "(Landroid/view/Surface;Ljava/lang/String;Ljava/lang/String;)V");
     // Pass the JNI Surface object to the videoPlayer with video and texture ID
-    env->CallStaticVoidMethod(videoClass, playVideoMethodID, jniSurface, videoPlayerID, textureIDString);
+    env->CallStaticVoidMethod(videoClass, createSurfaceVideoMethodID, jniSurface, videoPlayerID, textureIDString);
 }
 
 static UnityGfxRenderer s_DeviceType;
@@ -109,16 +115,22 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
     }
 }
 
-extern "C" void DeleteSurfaceID(int surfaceID){
-    Log("Deleting External ID: " + std::to_string(surfaceID));
-    auto env = getEnv();
-    jobject surface = surfaceTextures[surfaceID];
-    //remove from map so it doesnt get updated
-    surfaceTextures.erase(surfaceID);
-    //delete global ref
-    env->DeleteGlobalRef(surface);
+extern "C" void RegisterUnityTextureID(int videoID, int unityTextureID){
+    Log("Unity Texture ID: " + std::to_string(unityTextureID));
+    unityID = unityTextureID;
 }
 
+extern "C" void DeleteSurfaceID(int videoID){
+//    Log("Deleting External ID: " + std::to_string(surfaceID));
+//    auto env = getEnv();
+//    jobject surface = surfaceTextures[surfaceID];
+//    //remove from map so it doesnt get updated
+//    surfaceTextures.erase(surfaceID);
+//    //delete global ref
+//    env->DeleteGlobalRef(surface);
+}
+
+static bool setup = false;
 static void UpdateAndroidSurfaces(){
     //call update on android surface texture object
     auto env = getEnv();
@@ -128,6 +140,48 @@ static void UpdateAndroidSurfaces(){
     //iterate through map to update textures
     for (it = surfaceTextures.begin(); it != surfaceTextures.end(); it++) {
         env->CallVoidMethod(it->second, updateTexImageMethodId);
+    }
+
+    if (surfaceTextures.size() > 0 && !setup) {
+        Log("BINDING UNITY TEXTURE: " + std::to_string(unityID));
+        setup = true;
+        //bind external texture
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_EXTERNAL_OES, externalID);
+        //bind unity texture
+        glActiveTexture( GL_TEXTURE1 );
+        glBindTexture( GL_TEXTURE_2D, unityID);
+        //glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA,
+         //             1080, 1920, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL );
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 1080, 1920,
+                        GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+
+        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR );
+        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+
+        glBindTexture( GL_TEXTURE_2D, 0 );
+        glActiveTexture( GL_TEXTURE0 );
+
+        glGenFramebuffers( 1, &fbo );
+        glBindFramebuffer( GL_FRAMEBUFFER, fbo );
+        glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                                unityID, 0 );
+        glBindFramebuffer( GL_FRAMEBUFFER, 0 );
+    }
+
+    if (surfaceTextures.size() > 0){
+        Log("UPDATING UNITY TEXTURE...");
+        glBindFramebuffer( GL_FRAMEBUFFER, fbo );
+        glBindTexture( GL_TEXTURE_EXTERNAL_OES, 0 );
+        glBindFramebuffer( GL_FRAMEBUFFER, 0 );
+
+
+
+        glBindTexture( GL_TEXTURE_2D, unityID );
+        glGenerateMipmap( GL_TEXTURE_2D );
+        glBindTexture( GL_TEXTURE_2D, 0 );
     }
 }
 
