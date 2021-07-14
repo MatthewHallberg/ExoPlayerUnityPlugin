@@ -23,6 +23,16 @@ static std::map<int, jobject>::iterator it;
 static int unityID;
 static uint externalID;
 static uint fbo;
+GLuint m_VertexShader;
+GLuint m_FragmentShader;
+GLuint m_Program;
+GLuint quad_VertexArrayID;
+GLuint quad_vertexbuffer;
+
+enum VertexInputs {
+    VERTEX_ATTRIBUTE_LOCATION_POSITION = 0,
+    VERTEX_ATTRIBUTE_LOCATION_UV0 = 1
+};
 
 JNIEnv* getEnv() {
     JNIEnv *env;
@@ -130,6 +140,76 @@ extern "C" void DeleteSurfaceID(int videoID){
 //    env->DeleteGlobalRef(surface);
 }
 
+static GLuint CreateShader(GLenum type, const char* sourceText) {
+    GLuint ret = glCreateShader(type);
+    glShaderSource(ret, 1, &sourceText, NULL);
+    glCompileShader(ret);
+    return ret;
+}
+
+static void CreateQuad(){
+
+#if SUPPORT_OPENGL_CORE
+    glGenVertexArrays(1, &quad_VertexArrayID);
+    glBindVertexArray(quad_VertexArrayID);
+#endif // if SUPPORT_OPENGL_CORE
+
+    static const GLfloat g_quad_vertex_buffer_data[] = {
+            -1.0f, -1.0f, 0.0f,
+            1.0f, -1.0f, 0.0f,
+            -1.0f,  1.0f, 0.0f,
+            -1.0f,  1.0f, 0.0f,
+            1.0f, -1.0f, 0.0f,
+            1.0f,  1.0f, 0.0f,
+    };
+
+    //create vertext buffer
+    glGenBuffers(1, &quad_vertexbuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(g_quad_vertex_buffer_data), g_quad_vertex_buffer_data, GL_STATIC_DRAW);
+    assert(glGetError() == GL_NO_ERROR);
+
+    const char* vertex_shader =
+            "uniform highp mat4 Mvpm;\n"
+            "attribute vec4 Position;\n"
+            "attribute vec2 TexCoord;\n"
+            "varying  highp vec2 oTexCoord;\n"
+            "void main()\n"
+            "{\n"
+            "   gl_Position = Position;\n"
+            "   oTexCoord = TexCoord;\n"
+            "}\n";
+    const char* frag_shader =
+            "#extension GL_OES_EGL_image_external : require\n"
+            "uniform samplerExternalOES Texture0;\n"
+            "varying highp vec2 oTexCoord;\n"
+            "void main()\n"
+            "{\n"
+            "	gl_FragColor = texture2D( Texture0, oTexCoord );\n"
+            "}\n";
+
+    m_VertexShader = CreateShader(GL_VERTEX_SHADER, vertex_shader);
+    m_FragmentShader = CreateShader(GL_FRAGMENT_SHADER, frag_shader);
+
+    // Link shaders into a program and find uniform locations
+    m_Program = glCreateProgram();
+
+    glBindAttribLocation( m_Program, VERTEX_ATTRIBUTE_LOCATION_POSITION,		"Position" );
+    glBindAttribLocation( m_Program, VERTEX_ATTRIBUTE_LOCATION_UV0,			"TexCoord" );
+
+    glAttachShader(m_Program, m_VertexShader);
+    glAttachShader(m_Program, m_FragmentShader);
+
+#	if SUPPORT_OPENGL_CORE
+    //glBindFragDataLocation(m_Program, 0, "fragColor");
+#	endif // if SUPPORT_OPENGL_CORE
+    glLinkProgram(m_Program);
+
+    GLint status = 0;
+    glGetProgramiv(m_Program, GL_LINK_STATUS, &status);
+    assert(status == GL_TRUE);
+}
+
 static bool setup = false;
 static void UpdateAndroidSurfaces(){
     //call update on android surface texture object
@@ -155,29 +235,45 @@ static void UpdateAndroidSurfaces(){
          //             1080, 1920, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL );
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 1080, 1920,
                         GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-
         glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
         glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR );
+        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
         glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
 
         glBindTexture( GL_TEXTURE_2D, 0 );
         glActiveTexture( GL_TEXTURE0 );
 
+        //generate frame buffer and bind to unity texture
         glGenFramebuffers( 1, &fbo );
         glBindFramebuffer( GL_FRAMEBUFFER, fbo );
         glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
                                 unityID, 0 );
         glBindFramebuffer( GL_FRAMEBUFFER, 0 );
+
+        //create quad and shader program
+        CreateQuad();
     }
 
     if (surfaceTextures.size() > 0){
-        Log("UPDATING UNITY TEXTURE...");
+
         glBindFramebuffer( GL_FRAMEBUFFER, fbo );
+        glDisable( GL_DEPTH_TEST );
+        glDisable( GL_SCISSOR_TEST );
+        glDisable( GL_STENCIL_TEST );
+        glDisable( GL_CULL_FACE );
+        glDisable( GL_BLEND );
+
+//        const GLenum fboAttachments[1] = { GL_COLOR_ATTACHMENT0 };
+//        glInvalidateFramebuffer( GL_FRAMEBUFFER, 1, fboAttachments );
+
+        glViewport( 0, 0, 1080, 1920 );
+
+        glUseProgram(m_Program);
+        glDrawArrays(GL_TRIANGLES, 0, triangleCount * 3);
+
+        glUseProgram( 0 );
         glBindTexture( GL_TEXTURE_EXTERNAL_OES, 0 );
         glBindFramebuffer( GL_FRAMEBUFFER, 0 );
-
-
 
         glBindTexture( GL_TEXTURE_2D, unityID );
         glGenerateMipmap( GL_TEXTURE_2D );
